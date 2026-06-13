@@ -1,0 +1,17 @@
+{
+  "name": "zed-mcp-server-redmine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "npm run lint:js && npm test && cargo check && cargo clippy --all-targets --all-features -- -D warnings",
+    "format:check": "cargo fmt --check",
+    "lint": "npm run lint:js && cargo clippy --all-targets --all-features -- -D warnings",
+    "lint:js": "node --check server/index.js && node --check server/src/redmine.js && node --check server/src/tools.js && node --check test/redmine.test.js",
+    "start": "node server/index.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18.17"
+  }
+}

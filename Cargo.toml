@@ -1,0 +1,28 @@
+[package]
+name = "zed-mcp-server-redmine"
+version = "0.1.0"
+edition = "2024"
+description = "Zed MCP context server extension for Redmine."
+license = "MIT"
+repository = "https://github.com/weirdo-adam/zed-mcp-server-redmine"
+readme = "README.md"
+keywords = ["zed", "mcp", "redmine", "extension"]
+categories = ["development-tools"]
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+zed_extension_api = "0.7"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = "warn"
+dbg_macro = "warn"
+expect_used = "warn"
+panic = "warn"
+todo = "warn"
+unwrap_used = "warn"
