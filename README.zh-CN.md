@@ -148,17 +148,19 @@ scripts/check.sh
 MCP stdio transport 使用 stdout 输出按行分隔的 JSON-RPC 消息。日志和诊断信息
 必须写入 stderr。
 
-## 本地 Release
+## Release
 
-本地 release 包手动维护。构建 Zed extension wasm 并在 `dist/` 下生成发布包：
+GitHub Actions 会从 `main` 自动发布 release。当 `extension.toml` 中的版本还
+没有对应的远端 tag 和 GitHub Release 时，release workflow 会创建
+`v<version>`、构建发布包，并上传 archive 和校验文件。
+
+本地也可以构建同样的发布包：
 
 ```sh
 scripts/package-release.sh
 ```
 
-发布包包含 Zed 扩展文件、独立 MCP server、文档和本地安装脚本。若不通过 Zed
-扩展市场维护 release，可将生成的 archive 和 `.sha256` 文件作为 release assets
-发布。
+发布包包含 Zed 扩展文件、独立 MCP server、文档和本地安装脚本。
 
 ## 支持
 

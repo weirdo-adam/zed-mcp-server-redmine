@@ -196,17 +196,20 @@ REDMINE_MCP_READ_ONLY = "true"
 
 已暴露的 Redmine API 范围和 feature flags 见 [api-coverage.md](api-coverage.md)。
 
-## 本地 Release
+## Release
 
-本地 release 包手动维护：
+GitHub Actions 会从 `main` 自动发布 release。当 `extension.toml` 中的版本还
+没有对应的远端 tag 和 GitHub Release 时，release workflow 会创建
+`v<version>`、构建发布包，并上传 archive 和校验文件。
+
+本地也可以构建同样的发布包：
 
 ```sh
 scripts/package-release.sh
 ```
 
 脚本会执行校验、构建 `extension.wasm`、在 `dist/` 下生成
-`redmine-mcp-server-<version>.tar.gz` 和 `.sha256`。可将这两个文件作为手动
-release assets 发布。
+`redmine-mcp-server-<version>.tar.gz` 和 `.sha256`。
 
 ## 参考
 

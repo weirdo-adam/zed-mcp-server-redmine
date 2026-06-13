@@ -155,18 +155,21 @@ Rust clippy, and the Zed WASI target check.
 The MCP stdio transport uses newline-delimited JSON-RPC on stdout. Logs and
 diagnostics must be written to stderr.
 
-## Local Releases
+## Releases
 
-Local release archives are maintained manually. To build the Zed extension wasm
-and create a distributable archive under `dist/`:
+GitHub Actions publishes releases from `main`. When the version in
+`extension.toml` does not already have a remote tag and GitHub Release, the
+release workflow creates `v<version>`, builds the package, and uploads the
+archive plus checksum as release assets.
+
+To build the same release package locally:
 
 ```sh
 scripts/package-release.sh
 ```
 
 The archive includes the Zed extension files, the standalone MCP server, docs,
-and the local install script. Publish the generated archive and `.sha256` file
-as release assets when maintaining releases outside the Zed extension registry.
+and the local install script.
 
 ## Support
 

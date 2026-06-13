@@ -203,9 +203,14 @@ Use the same stdio contract:
 See [api-coverage.md](api-coverage.md) for the exposed Redmine API scope and
 feature flags.
 
-## Local Releases
+## Releases
 
-Local release archives are maintained manually:
+GitHub Actions publishes releases from `main`. When the version in
+`extension.toml` does not already have a remote tag and GitHub Release, the
+release workflow creates `v<version>`, builds the package, and uploads the
+archive plus checksum as release assets.
+
+To build the same package locally:
 
 ```sh
 scripts/package-release.sh
@@ -213,8 +218,6 @@ scripts/package-release.sh
 
 The script runs checks, builds `extension.wasm`, and writes
 `redmine-mcp-server-<version>.tar.gz` plus a `.sha256` file under `dist/`.
-Publish those two files as manual release assets when maintaining releases
-outside the Zed extension registry.
 
 ## References
 
