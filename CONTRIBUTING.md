@@ -12,7 +12,7 @@ Clone the repository and run checks from the repository root.
 
 ## Checks
 
-Run the same checks used by CI:
+Run the local check script before opening a pull request:
 
 ```sh
 scripts/check.sh

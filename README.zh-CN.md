@@ -94,7 +94,7 @@ scripts/check.sh
 ```
 
 检查脚本会执行 JavaScript 语法检查、Node.js 测试、Rust 格式检查、Rust clippy
-以及 Zed WASI target 检查。CI 会在 pull request 和推送到 `main` 时运行同一组检查。
+以及 Zed WASI target 检查。
 
 MCP stdio transport 使用 stdout 输出按行分隔的 JSON-RPC 消息。日志和诊断信息
 必须写入 stderr。

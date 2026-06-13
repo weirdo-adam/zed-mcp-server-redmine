@@ -98,8 +98,7 @@ scripts/check.sh
 ```
 
 The check script runs JavaScript syntax checks, Node.js tests, Rust formatting,
-Rust clippy, and the Zed WASI target check. CI runs the same checks on pull
-requests and pushes to `main`.
+Rust clippy, and the Zed WASI target check.
 
 The MCP stdio transport uses newline-delimited JSON-RPC on stdout. Logs and
 diagnostics must be written to stderr.
