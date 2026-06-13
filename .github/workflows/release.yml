@@ -73,23 +73,28 @@ jobs:
 
           tag_exists=false
           release_exists=false
+          release_is_draft=false
           skip=false
 
           if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
             tag_exists=true
           fi
 
-          if gh release view "$TAG" >/dev/null 2>&1; then
+          if draft=$(gh release view "$TAG" --json isDraft --jq '.isDraft' 2>/dev/null); then
             release_exists=true
+            if [ "$draft" = "true" ]; then
+              release_is_draft=true
+            fi
           fi
 
-          if [ "$tag_exists" = "true" ] && [ "$release_exists" = "true" ]; then
+          if [ "$tag_exists" = "true" ] && [ "$release_exists" = "true" ] && [ "$release_is_draft" != "true" ]; then
             skip=true
             echo "$TAG already has a remote tag and GitHub Release; skipping publish."
           fi
 
           echo "tag_exists=$tag_exists" >> "$GITHUB_OUTPUT"
           echo "release_exists=$release_exists" >> "$GITHUB_OUTPUT"
+          echo "release_is_draft=$release_is_draft" >> "$GITHUB_OUTPUT"
           echo "skip=$skip" >> "$GITHUB_OUTPUT"
 
       - name: Build release package
@@ -134,3 +139,13 @@ jobs:
           set -eu
 
           gh release upload "$TAG" "$ARCHIVE" "$CHECKSUM" --clobber
+
+      - name: Publish draft GitHub Release
+        if: steps.existing.outputs.skip != 'true' && steps.existing.outputs.release_exists == 'true' && steps.existing.outputs.release_is_draft == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.metadata.outputs.tag }}
+        run: |
+          set -eu
+
+          gh release edit "$TAG" --draft=false --latest --verify-tag
