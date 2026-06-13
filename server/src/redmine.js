@@ -23,7 +23,14 @@ export function createConfig(env = process.env, fetchImpl = globalThis.fetch) {
   return {
     baseUrl: trimTrailingSlash(env.REDMINE_BASE_URL || ""),
     apiKey: env.REDMINE_API_KEY || "",
-    readOnly: parseBoolean(env.REDMINE_READ_ONLY, false),
+    readOnly: parseBoolean(env.REDMINE_MCP_READ_ONLY, false),
+    disabledFeatures: {
+      checklists: parseBoolean(env.REDMINE_MCP_DISABLE_CHECKLISTS, false),
+      relations: parseBoolean(env.REDMINE_MCP_DISABLE_RELATIONS, false),
+      timeEntries: parseBoolean(env.REDMINE_MCP_DISABLE_TIME_ENTRIES, false),
+      versions: parseBoolean(env.REDMINE_MCP_DISABLE_VERSIONS, false),
+      watchers: parseBoolean(env.REDMINE_MCP_DISABLE_WATCHERS, false),
+    },
     silentWrites: parseBoolean(env.REDMINE_SILENT_WRITES, false),
     timeoutMs: Number(env.REDMINE_TIMEOUT_MS || 30000),
     fetchImpl,
@@ -39,6 +46,14 @@ export class RedmineClient {
     this.config = {
       ...config,
       baseUrl: trimTrailingSlash(config.baseUrl || ""),
+      disabledFeatures: {
+        checklists: false,
+        relations: false,
+        timeEntries: false,
+        versions: false,
+        watchers: false,
+        ...(config.disabledFeatures || {}),
+      },
       timeoutMs: Number(config.timeoutMs || 30000),
     };
     if (typeof this.config.fetchImpl !== "function") {

@@ -17,6 +17,7 @@ test("buildUrl trims base URL and serializes array query values", () => {
 test("tool list includes native checklist, time entry, version, and watcher tools", () => {
   const names = new Set(listTools().map((tool) => tool.name));
   assert.ok(names.has("redmine_list_checklists"));
+  assert.ok(names.has("redmine_list_issue_relations"));
   assert.ok(names.has("redmine_add_time_entry"));
   assert.ok(names.has("redmine_list_versions"));
   assert.ok(names.has("redmine_add_watcher"));
@@ -26,7 +27,12 @@ test("config reads REDMINE_* values from the environment", () => {
   const config = createConfig({
     REDMINE_BASE_URL: "https://redmine.example.com/",
     REDMINE_API_KEY: "secret",
-    REDMINE_READ_ONLY: "true",
+    REDMINE_MCP_READ_ONLY: "true",
+    REDMINE_MCP_DISABLE_CHECKLISTS: "true",
+    REDMINE_MCP_DISABLE_RELATIONS: "1",
+    REDMINE_MCP_DISABLE_TIME_ENTRIES: "yes",
+    REDMINE_MCP_DISABLE_VERSIONS: "on",
+    REDMINE_MCP_DISABLE_WATCHERS: "true",
     REDMINE_SILENT_WRITES: "yes",
     REDMINE_TIMEOUT_MS: "15000",
   });
@@ -34,8 +40,25 @@ test("config reads REDMINE_* values from the environment", () => {
   assert.equal(config.baseUrl, "https://redmine.example.com");
   assert.equal(config.apiKey, "secret");
   assert.equal(config.readOnly, true);
+  assert.deepEqual(config.disabledFeatures, {
+    checklists: true,
+    relations: true,
+    timeEntries: true,
+    versions: true,
+    watchers: true,
+  });
   assert.equal(config.silentWrites, true);
   assert.equal(config.timeoutMs, 15000);
+});
+
+test("legacy REDMINE_READ_ONLY is not supported", () => {
+  const config = createConfig({
+    REDMINE_BASE_URL: "https://redmine.example.com/",
+    REDMINE_API_KEY: "secret",
+    REDMINE_READ_ONLY: "true",
+  });
+
+  assert.equal(config.readOnly, false);
 });
 
 test("read-only mode hides write tools and keeps read tools visible", () => {
@@ -63,9 +86,68 @@ test("read-only mode rejects direct write tool calls before Redmine requests", a
           notes: "blocked",
         },
       }),
-    /REDMINE_READ_ONLY is enabled/
+    /REDMINE_MCP_READ_ONLY is enabled/
   );
   assert.equal(requests.length, 0);
+});
+
+test("feature disable flags hide grouped tools", () => {
+  const names = new Set(
+    listTools({
+      disabledFeatures: {
+        checklists: true,
+        relations: true,
+        timeEntries: true,
+        versions: true,
+        watchers: true,
+      },
+    }).map((tool) => tool.name)
+  );
+
+  assert.ok(names.has("redmine_get_issue"));
+  assert.equal(names.has("redmine_list_checklists"), false);
+  assert.equal(names.has("redmine_list_issue_relations"), false);
+  assert.equal(names.has("redmine_list_time_entries"), false);
+  assert.equal(names.has("redmine_list_time_entry_activities"), false);
+  assert.equal(names.has("redmine_list_versions"), false);
+  assert.equal(names.has("redmine_list_watchers"), false);
+});
+
+test("feature disable flags reject direct tool calls before Redmine requests", async () => {
+  const requests = [];
+  const client = createClient(requests, {
+    disabledFeatures: {
+      relations: true,
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      callTool(client, "redmine_add_issue_relation", {
+        issue_id: 42,
+        issue_to_id: 43,
+        relation_type: "relates",
+      }),
+    /REDMINE_MCP_DISABLE_RELATIONS is enabled/
+  );
+  assert.equal(requests.length, 0);
+});
+
+test("disabled issue features are removed from default get issue includes", async () => {
+  const requests = [];
+  const client = createClient(requests, {
+    disabledFeatures: {
+      checklists: true,
+      relations: true,
+      watchers: true,
+    },
+  });
+
+  await callTool(client, "redmine_get_issue", {
+    issue_id: 42,
+  });
+
+  assert.equal(requests[0].url, "https://redmine.example.com/issues/42.json?include=journals");
 });
 
 test("write silent mode returns compact output and passes notify=false", async () => {
@@ -94,6 +176,36 @@ test("write silent mode returns compact output and passes notify=false", async (
       hours: 1.5,
       activity_id: 9,
       comments: "Investigation",
+    },
+  });
+});
+
+test("issue relation creation targets Redmine relations endpoint", async () => {
+  const requests = [];
+  const client = createClient(requests);
+
+  const result = await callTool(client, "redmine_add_issue_relation", {
+    issue_id: 42,
+    issue_to_id: 43,
+    relation_type: "relates",
+    silent: true,
+  });
+
+  assert.deepEqual(result, {
+    ok: true,
+    operation: "add_issue_relation",
+    target: {
+      issue_id: 42,
+      issue_to_id: 43,
+      relation_type: "relates",
+    },
+    status: 201,
+  });
+  assert.equal(requests[0].url, "https://redmine.example.com/issues/42/relations.json?notify=false");
+  assert.deepEqual(JSON.parse(requests[0].request.body), {
+    relation: {
+      issue_to_id: 43,
+      relation_type: "relates",
     },
   });
 });
@@ -206,6 +318,13 @@ function createClient(requests, overrides = {}) {
     baseUrl: "https://redmine.example.com/",
     apiKey: "secret",
     readOnly: false,
+    disabledFeatures: {
+      checklists: false,
+      relations: false,
+      timeEntries: false,
+      versions: false,
+      watchers: false,
+    },
     timeoutMs: 30000,
     silentWrites: false,
     fetchImpl: async (url, request) => {

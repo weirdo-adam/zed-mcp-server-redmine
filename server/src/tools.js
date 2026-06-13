@@ -21,6 +21,8 @@ const silentWriteProperties = {
 
 const WRITE_TOOLS = new Set([
   "redmine_update_issue",
+  "redmine_add_issue_relation",
+  "redmine_delete_issue_relation",
   "redmine_add_checklist_item",
   "redmine_update_checklist_item",
   "redmine_delete_checklist_item",
@@ -33,6 +35,50 @@ const WRITE_TOOLS = new Set([
   "redmine_add_watcher",
   "redmine_remove_watcher",
 ]);
+
+const FEATURE_TOOLS = {
+  checklists: new Set([
+    "redmine_list_checklists",
+    "redmine_add_checklist_item",
+    "redmine_update_checklist_item",
+    "redmine_delete_checklist_item",
+  ]),
+  relations: new Set([
+    "redmine_list_issue_relations",
+    "redmine_get_issue_relation",
+    "redmine_add_issue_relation",
+    "redmine_delete_issue_relation",
+  ]),
+  timeEntries: new Set([
+    "redmine_list_time_entries",
+    "redmine_add_time_entry",
+    "redmine_update_time_entry",
+    "redmine_delete_time_entry",
+    "redmine_list_time_entry_activities",
+  ]),
+  versions: new Set([
+    "redmine_list_versions",
+    "redmine_get_version",
+    "redmine_create_version",
+    "redmine_update_version",
+    "redmine_delete_version",
+  ]),
+  watchers: new Set([
+    "redmine_list_watchers",
+    "redmine_add_watcher",
+    "redmine_remove_watcher",
+  ]),
+};
+
+const FEATURE_ENV = {
+  checklists: "REDMINE_MCP_DISABLE_CHECKLISTS",
+  relations: "REDMINE_MCP_DISABLE_RELATIONS",
+  timeEntries: "REDMINE_MCP_DISABLE_TIME_ENTRIES",
+  versions: "REDMINE_MCP_DISABLE_VERSIONS",
+  watchers: "REDMINE_MCP_DISABLE_WATCHERS",
+};
+
+const DEFAULT_ISSUE_INCLUDES = ["journals", "watchers", "checklists", "relations"];
 
 export class InputError extends Error {
   constructor(message) {
@@ -63,7 +109,7 @@ export const TOOLS = [
               "changesets",
             ],
           },
-          default: ["journals", "watchers", "checklists"],
+          default: DEFAULT_ISSUE_INCLUDES,
         },
       },
       ["issue_id"]
@@ -100,6 +146,64 @@ export const TOOLS = [
         ...silentWriteProperties,
       },
       ["issue_id", "fields"]
+    ),
+  },
+  {
+    name: "redmine_list_issue_relations",
+    description: "List relations for a Redmine issue.",
+    inputSchema: objectSchema(
+      {
+        issue_id: integer("Redmine issue ID."),
+      },
+      ["issue_id"]
+    ),
+  },
+  {
+    name: "redmine_get_issue_relation",
+    description: "Get one Redmine issue relation.",
+    inputSchema: objectSchema(
+      {
+        relation_id: integer("Issue relation ID."),
+      },
+      ["relation_id"]
+    ),
+  },
+  {
+    name: "redmine_add_issue_relation",
+    description: "Add a relation from one Redmine issue to another.",
+    inputSchema: objectSchema(
+      {
+        issue_id: integer("Source Redmine issue ID."),
+        issue_to_id: integer("Target Redmine issue ID."),
+        relation_type: {
+          type: "string",
+          enum: [
+            "relates",
+            "duplicates",
+            "duplicated",
+            "blocks",
+            "blocked",
+            "precedes",
+            "follows",
+            "copied_to",
+            "copied_from",
+          ],
+        },
+        delay: integer("Delay in days for precedes/follows relations."),
+        ...silentWriteProperties,
+      },
+      ["issue_id", "issue_to_id", "relation_type"]
+    ),
+  },
+  {
+    name: "redmine_delete_issue_relation",
+    description: "Delete a Redmine issue relation.",
+    inputSchema: objectSchema(
+      {
+        relation_id: integer("Issue relation ID."),
+        ...silentWriteProperties,
+      },
+      ["relation_id"]
     ),
   },
   {
@@ -349,7 +453,7 @@ const handlers = {
     return unwrap(
       await client.request("GET", `/issues/${encodeURIComponent(issueId)}.json`, {
         query: {
-          include: args.include || ["journals", "watchers", "checklists"],
+          include: issueIncludes(client, args.include),
         },
       })
     );
@@ -367,6 +471,54 @@ const handlers = {
       body: { issue: fields },
     });
     return writeResult(client, args, "update_issue", { issue_id: issueId }, response);
+  },
+
+  async redmine_list_issue_relations(client, args) {
+    const issueId = required(args, "issue_id");
+    return unwrap(
+      await client.request("GET", `/issues/${encodeURIComponent(issueId)}/relations.json`)
+    );
+  },
+
+  async redmine_get_issue_relation(client, args) {
+    const relationId = required(args, "relation_id");
+    return unwrap(await client.request("GET", `/relations/${encodeURIComponent(relationId)}.json`));
+  },
+
+  async redmine_add_issue_relation(client, args) {
+    const issueId = required(args, "issue_id");
+    const issueToId = required(args, "issue_to_id");
+    const relationType = required(args, "relation_type");
+    const relation = {
+      issue_to_id: issueToId,
+      relation_type: relationType,
+      ...pickDefined(args, ["delay"]),
+    };
+    const response = await client.request(
+      "POST",
+      `/issues/${encodeURIComponent(issueId)}/relations.json`,
+      {
+        query: writeQuery(client, args),
+        body: { relation },
+      }
+    );
+    return writeResult(
+      client,
+      args,
+      "add_issue_relation",
+      { issue_id: issueId, issue_to_id: issueToId, relation_type: relationType },
+      response
+    );
+  },
+
+  async redmine_delete_issue_relation(client, args) {
+    const relationId = required(args, "relation_id");
+    const response = await client.request(
+      "DELETE",
+      `/relations/${encodeURIComponent(relationId)}.json`,
+      { query: writeQuery(client, args) }
+    );
+    return writeResult(client, args, "delete_issue_relation", { relation_id: relationId }, response);
   },
 
   async redmine_list_checklists(client, args) {
@@ -583,10 +735,15 @@ const handlers = {
 };
 
 export function listTools(config = {}) {
-  if (config.readOnly) {
-    return TOOLS.filter((tool) => !WRITE_TOOLS.has(tool.name));
-  }
-  return TOOLS;
+  return TOOLS.filter((tool) => {
+    if (disabledFeatureForTool(config, tool.name)) {
+      return false;
+    }
+    if (config.readOnly && WRITE_TOOLS.has(tool.name)) {
+      return false;
+    }
+    return true;
+  });
 }
 
 export async function callTool(client, name, args = {}) {
@@ -594,8 +751,12 @@ export async function callTool(client, name, args = {}) {
   if (!handler) {
     throw new InputError(`Unknown tool: ${name}`);
   }
+  const disabledFeature = disabledFeatureForTool(client.config, name);
+  if (disabledFeature) {
+    throw new Error(`${FEATURE_ENV[disabledFeature]} is enabled; tool ${name} is disabled`);
+  }
   if (client.config && client.config.readOnly && WRITE_TOOLS.has(name)) {
-    throw new Error(`REDMINE_READ_ONLY is enabled; write tool ${name} is disabled`);
+    throw new Error(`REDMINE_MCP_READ_ONLY is enabled; write tool ${name} is disabled`);
   }
   return handler(client, args || {});
 }
@@ -672,6 +833,48 @@ function filterArgs(args) {
     }
   }
   return result;
+}
+
+function issueIncludes(client, requestedIncludes) {
+  const disabled = disabledFeatures(client.config);
+  const includes =
+    Array.isArray(requestedIncludes) && requestedIncludes.length
+      ? requestedIncludes
+      : DEFAULT_ISSUE_INCLUDES;
+  const filtered = includes.filter((include) => {
+    if (include === "checklists") {
+      return !disabled.checklists;
+    }
+    if (include === "relations") {
+      return !disabled.relations;
+    }
+    if (include === "watchers") {
+      return !disabled.watchers;
+    }
+    return true;
+  });
+  return filtered.length ? filtered : undefined;
+}
+
+function disabledFeatureForTool(config = {}, toolName) {
+  const disabled = disabledFeatures(config);
+  for (const [feature, tools] of Object.entries(FEATURE_TOOLS)) {
+    if (disabled[feature] && tools.has(toolName)) {
+      return feature;
+    }
+  }
+  return null;
+}
+
+function disabledFeatures(config = {}) {
+  return {
+    checklists: false,
+    relations: false,
+    timeEntries: false,
+    versions: false,
+    watchers: false,
+    ...(config.disabledFeatures || {}),
+  };
 }
 
 function pickDefined(source, keys) {

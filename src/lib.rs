@@ -89,9 +89,54 @@ fn env_from_settings(settings: &zed::serde_json::Value) -> Vec<(String, String)>
         ("REDMINE_API_KEY", "REDMINE_API_KEY"),
         ("redmine_api_key", "REDMINE_API_KEY"),
         ("api_key", "REDMINE_API_KEY"),
-        ("REDMINE_READ_ONLY", "REDMINE_READ_ONLY"),
-        ("redmine_read_only", "REDMINE_READ_ONLY"),
-        ("read_only", "REDMINE_READ_ONLY"),
+        ("REDMINE_MCP_READ_ONLY", "REDMINE_MCP_READ_ONLY"),
+        ("redmine_mcp_read_only", "REDMINE_MCP_READ_ONLY"),
+        ("read_only", "REDMINE_MCP_READ_ONLY"),
+        (
+            "REDMINE_MCP_DISABLE_CHECKLISTS",
+            "REDMINE_MCP_DISABLE_CHECKLISTS",
+        ),
+        (
+            "redmine_mcp_disable_checklists",
+            "REDMINE_MCP_DISABLE_CHECKLISTS",
+        ),
+        ("disable_checklists", "REDMINE_MCP_DISABLE_CHECKLISTS"),
+        (
+            "REDMINE_MCP_DISABLE_RELATIONS",
+            "REDMINE_MCP_DISABLE_RELATIONS",
+        ),
+        (
+            "redmine_mcp_disable_relations",
+            "REDMINE_MCP_DISABLE_RELATIONS",
+        ),
+        ("disable_relations", "REDMINE_MCP_DISABLE_RELATIONS"),
+        (
+            "REDMINE_MCP_DISABLE_TIME_ENTRIES",
+            "REDMINE_MCP_DISABLE_TIME_ENTRIES",
+        ),
+        (
+            "redmine_mcp_disable_time_entries",
+            "REDMINE_MCP_DISABLE_TIME_ENTRIES",
+        ),
+        ("disable_time_entries", "REDMINE_MCP_DISABLE_TIME_ENTRIES"),
+        (
+            "REDMINE_MCP_DISABLE_VERSIONS",
+            "REDMINE_MCP_DISABLE_VERSIONS",
+        ),
+        (
+            "redmine_mcp_disable_versions",
+            "REDMINE_MCP_DISABLE_VERSIONS",
+        ),
+        ("disable_versions", "REDMINE_MCP_DISABLE_VERSIONS"),
+        (
+            "REDMINE_MCP_DISABLE_WATCHERS",
+            "REDMINE_MCP_DISABLE_WATCHERS",
+        ),
+        (
+            "redmine_mcp_disable_watchers",
+            "REDMINE_MCP_DISABLE_WATCHERS",
+        ),
+        ("disable_watchers", "REDMINE_MCP_DISABLE_WATCHERS"),
         ("REDMINE_SILENT_WRITES", "REDMINE_SILENT_WRITES"),
         ("redmine_silent_writes", "REDMINE_SILENT_WRITES"),
         ("silent_writes", "REDMINE_SILENT_WRITES"),
@@ -126,7 +171,12 @@ const INSTALLATION_INSTRUCTIONS: &str = r#"Configure the Redmine context server 
       "settings": {
         "REDMINE_BASE_URL": "https://redmine.example.com",
         "REDMINE_API_KEY": "your-api-key",
-        "REDMINE_READ_ONLY": false,
+        "REDMINE_MCP_READ_ONLY": false,
+        "REDMINE_MCP_DISABLE_CHECKLISTS": false,
+        "REDMINE_MCP_DISABLE_RELATIONS": false,
+        "REDMINE_MCP_DISABLE_TIME_ENTRIES": false,
+        "REDMINE_MCP_DISABLE_VERSIONS": false,
+        "REDMINE_MCP_DISABLE_WATCHERS": false,
         "REDMINE_SILENT_WRITES": false
       }
     }
@@ -140,7 +190,12 @@ const DEFAULT_SETTINGS: &str = r#"{
   "settings": {
     "REDMINE_BASE_URL": "https://redmine.example.com",
     "REDMINE_API_KEY": "",
-    "REDMINE_READ_ONLY": false,
+    "REDMINE_MCP_READ_ONLY": false,
+    "REDMINE_MCP_DISABLE_CHECKLISTS": false,
+    "REDMINE_MCP_DISABLE_RELATIONS": false,
+    "REDMINE_MCP_DISABLE_TIME_ENTRIES": false,
+    "REDMINE_MCP_DISABLE_VERSIONS": false,
+    "REDMINE_MCP_DISABLE_WATCHERS": false,
     "REDMINE_SILENT_WRITES": false,
     "REDMINE_TIMEOUT_MS": 30000
   }
@@ -159,10 +214,35 @@ const SETTINGS_SCHEMA: &str = r#"{
       "type": "string",
       "description": "Redmine REST API key."
     },
-    "REDMINE_READ_ONLY": {
+    "REDMINE_MCP_READ_ONLY": {
       "type": "boolean",
       "default": false,
       "description": "When true, write tools are hidden from tools/list and rejected if called directly."
+    },
+    "REDMINE_MCP_DISABLE_CHECKLISTS": {
+      "type": "boolean",
+      "default": false,
+      "description": "Disable checklist tools. Checklist tools require the redmine_checklists plugin when this is false."
+    },
+    "REDMINE_MCP_DISABLE_RELATIONS": {
+      "type": "boolean",
+      "default": false,
+      "description": "Disable issue relation tools."
+    },
+    "REDMINE_MCP_DISABLE_TIME_ENTRIES": {
+      "type": "boolean",
+      "default": false,
+      "description": "Disable time entry tools."
+    },
+    "REDMINE_MCP_DISABLE_VERSIONS": {
+      "type": "boolean",
+      "default": false,
+      "description": "Disable version and milestone tools."
+    },
+    "REDMINE_MCP_DISABLE_WATCHERS": {
+      "type": "boolean",
+      "default": false,
+      "description": "Disable watcher tools."
     },
     "REDMINE_SILENT_WRITES": {
       "type": "boolean",
@@ -178,3 +258,55 @@ const SETTINGS_SCHEMA: &str = r#"{
   },
   "required": ["REDMINE_BASE_URL", "REDMINE_API_KEY"]
 }"#;
+
+#[cfg(test)]
+mod tests {
+    use super::env_from_settings;
+    use zed_extension_api::serde_json::json;
+
+    #[test]
+    fn maps_redmine_mcp_settings_to_environment() {
+        let env = env_from_settings(&json!({
+            "REDMINE_BASE_URL": "https://redmine.example.com/",
+            "REDMINE_API_KEY": "secret",
+            "REDMINE_MCP_READ_ONLY": true,
+            "REDMINE_MCP_DISABLE_CHECKLISTS": true,
+            "REDMINE_MCP_DISABLE_RELATIONS": true,
+            "REDMINE_MCP_DISABLE_TIME_ENTRIES": true,
+            "REDMINE_MCP_DISABLE_VERSIONS": true,
+            "REDMINE_MCP_DISABLE_WATCHERS": true,
+            "REDMINE_SILENT_WRITES": true,
+            "REDMINE_TIMEOUT_MS": 15000
+        }));
+
+        assert_env(&env, "REDMINE_BASE_URL", "https://redmine.example.com/");
+        assert_env(&env, "REDMINE_API_KEY", "secret");
+        assert_env(&env, "REDMINE_MCP_READ_ONLY", "true");
+        assert_env(&env, "REDMINE_MCP_DISABLE_CHECKLISTS", "true");
+        assert_env(&env, "REDMINE_MCP_DISABLE_RELATIONS", "true");
+        assert_env(&env, "REDMINE_MCP_DISABLE_TIME_ENTRIES", "true");
+        assert_env(&env, "REDMINE_MCP_DISABLE_VERSIONS", "true");
+        assert_env(&env, "REDMINE_MCP_DISABLE_WATCHERS", "true");
+        assert_env(&env, "REDMINE_SILENT_WRITES", "true");
+        assert_env(&env, "REDMINE_TIMEOUT_MS", "15000");
+    }
+
+    #[test]
+    fn does_not_map_legacy_read_only_setting() {
+        let env = env_from_settings(&json!({
+            "REDMINE_READ_ONLY": true
+        }));
+
+        assert!(!env.iter().any(|(key, _)| key == "REDMINE_READ_ONLY"));
+        assert!(!env.iter().any(|(key, _)| key == "REDMINE_MCP_READ_ONLY"));
+    }
+
+    fn assert_env(env: &[(String, String)], key: &str, expected: &str) {
+        assert_eq!(
+            env.iter()
+                .find(|(env_key, _)| env_key == key)
+                .map(|(_, value)| value.as_str()),
+            Some(expected)
+        );
+    }
+}
