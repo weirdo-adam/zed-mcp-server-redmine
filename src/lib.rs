@@ -162,42 +162,17 @@ fn setting_value_to_env(value: &zed::serde_json::Value) -> Option<String> {
     }
 }
 
-const INSTALLATION_INSTRUCTIONS: &str = r#"Configure the Redmine context server in Zed `settings.json`:
+const INSTALLATION_INSTRUCTIONS: &str = r#"Set `REDMINE_BASE_URL` and `REDMINE_API_KEY` below to connect Zed to Redmine.
 
-```json
-{
-  "context_servers": {
-    "redmine": {
-      "settings": {
-        "REDMINE_BASE_URL": "https://redmine.example.com",
-        "REDMINE_API_KEY": "your-api-key",
-        "REDMINE_MCP_READ_ONLY": false,
-        "REDMINE_MCP_DISABLE_CHECKLISTS": false,
-        "REDMINE_MCP_DISABLE_RELATIONS": false,
-        "REDMINE_MCP_DISABLE_TIME_ENTRIES": false,
-        "REDMINE_MCP_DISABLE_VERSIONS": false,
-        "REDMINE_MCP_DISABLE_WATCHERS": false,
-        "REDMINE_SILENT_WRITES": false
-      }
-    }
-  }
-}
-```
+Core issue, search, and metadata tools are always active. Optional tool groups are enabled by default; add `REDMINE_MCP_DISABLE_*` settings only when a group or plugin is not needed.
 
-The bundled server runs with Zed's Node.js runtime. You can also provide `command.path`, `command.arguments`, and `command.env` if you want to run a different server entrypoint."#;
+Use `REDMINE_MCP_READ_ONLY=true` when the agent should inspect Redmine without making changes."#;
 
 const DEFAULT_SETTINGS: &str = r#"{
   "settings": {
     "REDMINE_BASE_URL": "https://redmine.example.com",
     "REDMINE_API_KEY": "",
-    "REDMINE_MCP_READ_ONLY": false,
-    "REDMINE_MCP_DISABLE_CHECKLISTS": false,
-    "REDMINE_MCP_DISABLE_RELATIONS": false,
-    "REDMINE_MCP_DISABLE_TIME_ENTRIES": false,
-    "REDMINE_MCP_DISABLE_VERSIONS": false,
-    "REDMINE_MCP_DISABLE_WATCHERS": false,
-    "REDMINE_SILENT_WRITES": false,
-    "REDMINE_TIMEOUT_MS": 30000
+    "REDMINE_MCP_READ_ONLY": false
   }
 }"#;
 

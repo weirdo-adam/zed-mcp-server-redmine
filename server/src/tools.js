@@ -20,6 +20,7 @@ const silentWriteProperties = {
 };
 
 const WRITE_TOOLS = new Set([
+  "redmine_create_issue",
   "redmine_update_issue",
   "redmine_add_issue_relation",
   "redmine_delete_issue_relation",
@@ -131,6 +132,46 @@ export const TOOLS = [
     }),
   },
   {
+    name: "redmine_create_issue",
+    description: "Create a Redmine issue. Supports Redmine notify=false email suppression.",
+    inputSchema: objectSchema(
+      {
+        project_id: stringOrInteger("Project identifier or numeric ID."),
+        subject: { type: "string", description: "Issue subject." },
+        description: { type: "string" },
+        tracker_id: integer("Tracker ID."),
+        status_id: integer("Status ID."),
+        priority_id: integer("Priority ID."),
+        assigned_to_id: integer("Assignee user ID."),
+        category_id: integer("Issue category ID."),
+        fixed_version_id: integer("Target version ID."),
+        parent_issue_id: integer("Parent issue ID."),
+        start_date: { type: "string", description: "Start date in YYYY-MM-DD format." },
+        due_date: { type: "string", description: "Due date in YYYY-MM-DD format." },
+        done_ratio: integer("Done ratio percentage."),
+        estimated_hours: { type: "number", minimum: 0 },
+        custom_fields: {
+          type: "array",
+          description: "Redmine custom_fields payload.",
+          items: { type: "object", additionalProperties: true },
+        },
+        watcher_user_ids: {
+          type: "array",
+          description: "Watcher user IDs to add on creation.",
+          items: { type: "integer" },
+        },
+        fields: {
+          type: "object",
+          description:
+            "Additional Redmine issue payload fields. Explicit top-level fields override matching values.",
+          additionalProperties: true,
+        },
+        ...silentWriteProperties,
+      },
+      ["project_id", "subject"]
+    ),
+  },
+  {
     name: "redmine_update_issue",
     description:
       "Update a Redmine issue, including notes and checklists_attributes for the Redmine Checklists plugin.",
@@ -146,6 +187,33 @@ export const TOOLS = [
         ...silentWriteProperties,
       },
       ["issue_id", "fields"]
+    ),
+  },
+  {
+    name: "redmine_search",
+    description: "Search across Redmine using the native search API.",
+    inputSchema: objectSchema(
+      {
+        q: { type: "string", description: "Search query." },
+        scope: {
+          type: "string",
+          description: "Optional project scope, for example all or a project identifier.",
+        },
+        all_words: { type: "boolean" },
+        titles_only: { type: "boolean" },
+        issues: { type: "boolean" },
+        news: { type: "boolean" },
+        documents: { type: "boolean" },
+        changesets: { type: "boolean" },
+        wiki_pages: { type: "boolean" },
+        messages: { type: "boolean" },
+        projects: { type: "boolean" },
+        open_issues: { type: "boolean" },
+        attachments: { type: "boolean" },
+        offset: { type: "integer", minimum: 0 },
+        limit: readLimit,
+      },
+      ["q"]
     ),
   },
   {
@@ -463,6 +531,35 @@ const handlers = {
     return unwrap(await client.request("GET", "/issues.json", { query: filterArgs(args) }));
   },
 
+  async redmine_create_issue(client, args) {
+    const issue = {
+      ...optionalObjectArg(args, "fields"),
+      ...pickDefined(args, [
+        "project_id",
+        "subject",
+        "description",
+        "tracker_id",
+        "status_id",
+        "priority_id",
+        "assigned_to_id",
+        "category_id",
+        "fixed_version_id",
+        "parent_issue_id",
+        "start_date",
+        "due_date",
+        "done_ratio",
+        "estimated_hours",
+        "custom_fields",
+        "watcher_user_ids",
+      ]),
+    };
+    const response = await client.request("POST", "/issues.json", {
+      query: writeQuery(client, args),
+      body: { issue },
+    });
+    return writeResult(client, args, "create_issue", targetFrom(issue), response);
+  },
+
   async redmine_update_issue(client, args) {
     const issueId = required(args, "issue_id");
     const fields = objectArg(args, "fields");
@@ -471,6 +568,10 @@ const handlers = {
       body: { issue: fields },
     });
     return writeResult(client, args, "update_issue", { issue_id: issueId }, response);
+  },
+
+  async redmine_search(client, args) {
+    return unwrap(await client.request("GET", "/search.json", { query: filterArgs(args) }));
   },
 
   async redmine_list_issue_relations(client, args) {
@@ -896,6 +997,17 @@ function required(args, key) {
 
 function objectArg(args, key) {
   const value = required(args, key);
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new InputError(`${key} must be an object`);
+  }
+  return value;
+}
+
+function optionalObjectArg(args, key) {
+  const value = args[key];
+  if (value === undefined || value === null) {
+    return {};
+  }
   if (typeof value !== "object" || Array.isArray(value)) {
     throw new InputError(`${key} must be an object`);
   }

@@ -14,8 +14,10 @@ test("buildUrl trims base URL and serializes array query values", () => {
   );
 });
 
-test("tool list includes native checklist, time entry, version, and watcher tools", () => {
+test("tool list includes core and optional Redmine tools", () => {
   const names = new Set(listTools().map((tool) => tool.name));
+  assert.ok(names.has("redmine_create_issue"));
+  assert.ok(names.has("redmine_search"));
   assert.ok(names.has("redmine_list_checklists"));
   assert.ok(names.has("redmine_list_issue_relations"));
   assert.ok(names.has("redmine_add_time_entry"));
@@ -64,10 +66,12 @@ test("legacy REDMINE_READ_ONLY is not supported", () => {
 test("read-only mode hides write tools and keeps read tools visible", () => {
   const names = new Set(listTools({ readOnly: true }).map((tool) => tool.name));
   assert.ok(names.has("redmine_get_issue"));
+  assert.ok(names.has("redmine_search"));
   assert.ok(names.has("redmine_list_checklists"));
   assert.ok(names.has("redmine_list_time_entries"));
   assert.ok(names.has("redmine_list_versions"));
   assert.ok(names.has("redmine_list_watchers"));
+  assert.equal(names.has("redmine_create_issue"), false);
   assert.equal(names.has("redmine_update_issue"), false);
   assert.equal(names.has("redmine_add_time_entry"), false);
   assert.equal(names.has("redmine_create_version"), false);
@@ -148,6 +152,61 @@ test("disabled issue features are removed from default get issue includes", asyn
   });
 
   assert.equal(requests[0].url, "https://redmine.example.com/issues/42.json?include=journals");
+});
+
+test("search targets the native Redmine search endpoint", async () => {
+  const requests = [];
+  const client = createClient(requests);
+
+  await callTool(client, "redmine_search", {
+    q: "upgrade",
+    issues: true,
+    open_issues: true,
+    limit: 10,
+  });
+
+  const url = new URL(requests[0].url);
+  assert.equal(url.pathname, "/search.json");
+  assert.equal(url.searchParams.get("q"), "upgrade");
+  assert.equal(url.searchParams.get("issues"), "true");
+  assert.equal(url.searchParams.get("open_issues"), "true");
+  assert.equal(url.searchParams.get("limit"), "10");
+});
+
+test("issue creation targets the Redmine issues endpoint", async () => {
+  const requests = [];
+  const client = createClient(requests);
+
+  const result = await callTool(client, "redmine_create_issue", {
+    project_id: "demo",
+    subject: "Create issue from MCP",
+    description: "Created by test",
+    priority_id: 3,
+    fields: {
+      tracker_id: 2,
+    },
+    silent: true,
+  });
+
+  assert.deepEqual(result, {
+    ok: true,
+    operation: "create_issue",
+    target: {
+      project_id: "demo",
+    },
+    status: 201,
+  });
+  assert.equal(requests[0].url, "https://redmine.example.com/issues.json?notify=false");
+  assert.equal(requests[0].request.method, "POST");
+  assert.deepEqual(JSON.parse(requests[0].request.body), {
+    issue: {
+      tracker_id: 2,
+      project_id: "demo",
+      subject: "Create issue from MCP",
+      description: "Created by test",
+      priority_id: 3,
+    },
+  });
 });
 
 test("write silent mode returns compact output and passes notify=false", async () => {
