@@ -203,21 +203,14 @@ Use the same stdio contract:
 See [api-coverage.md](api-coverage.md) for the exposed Redmine API scope and
 feature flags.
 
-## Releases
+## Publishing
 
-GitHub Actions publishes releases from `main`. When the version in
-`extension.toml` does not already have a remote tag and GitHub Release, the
-release workflow creates `v<version>`, builds the package, and uploads the
-archive plus checksum as release assets.
+This repository does not publish a plugin tarball. Zed extension publishing is
+handled through Zed's extension registry, where the extension entry points at a
+repository commit and Zed builds the extension package.
 
-To build the same package locally:
-
-```sh
-scripts/package-release.sh
-```
-
-The script runs checks, builds `extension.wasm`, and writes
-`redmine-mcp-server-<version>.tar.gz` plus a `.sha256` file under `dist/`.
+Standalone `redmine-mcp-server` GitHub Releases and Homebrew formula updates
+belong to the standalone server distribution, not this plugin repository.
 
 ## References
 

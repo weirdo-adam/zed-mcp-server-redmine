@@ -27,14 +27,6 @@ cp "$REPO_ROOT/LICENSE" "$INSTALL_DIR/LICENSE"
 cp "$REPO_ROOT/docs/"*.md "$INSTALL_DIR/docs/"
 cp "$REPO_ROOT/scripts/install-local.sh" "$INSTALL_DIR/scripts/install-local.sh"
 
-if [ -f "$REPO_ROOT/extension.toml" ]; then
-  cp "$REPO_ROOT/extension.toml" "$INSTALL_DIR/extension.toml"
-fi
-
-if [ -f "$REPO_ROOT/extension.wasm" ]; then
-  cp "$REPO_ROOT/extension.wasm" "$INSTALL_DIR/extension.wasm"
-fi
-
 {
   printf '%s\n' '#!/usr/bin/env sh'
   printf 'exec node "%s/server/index.js" "$@"\n' "$INSTALL_DIR"

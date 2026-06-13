@@ -196,20 +196,13 @@ REDMINE_MCP_READ_ONLY = "true"
 
 已暴露的 Redmine API 范围和 feature flags 见 [api-coverage.md](api-coverage.md)。
 
-## Release
+## 发布
 
-GitHub Actions 会从 `main` 自动发布 release。当 `extension.toml` 中的版本还
-没有对应的远端 tag 和 GitHub Release 时，release workflow 会创建
-`v<version>`、构建发布包，并上传 archive 和校验文件。
+本仓库不发布插件 tarball。Zed 扩展发布通过 Zed 扩展市场完成：扩展条目指向
+具体仓库提交，由 Zed 侧构建扩展包。
 
-本地也可以构建同样的发布包：
-
-```sh
-scripts/package-release.sh
-```
-
-脚本会执行校验、构建 `extension.wasm`、在 `dist/` 下生成
-`redmine-mcp-server-<version>.tar.gz` 和 `.sha256`。
+独立 `redmine-mcp-server` 的 GitHub Releases 和 Homebrew formula 更新应放在
+独立 server 分发中，不放在这个插件仓库里。
 
 ## 参考
 

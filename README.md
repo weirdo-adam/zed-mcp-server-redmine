@@ -28,12 +28,13 @@ development tools that support stdio MCP servers.
 
 ## Project Positioning
 
-- Primary distribution: Zed extension.
-- Bundled runtime: standalone Redmine stdio MCP server.
-- Secondary usage: local MCP configuration for Claude, Codex, and other agent
-  tools.
+- Primary distribution: Zed extension with a bundled Redmine stdio MCP server.
+- Standalone distribution: `redmine-mcp-server` for Homebrew and other MCP
+  clients.
+- The bundled server keeps the Zed extension self-contained. Homebrew installs
+  live in a separate path and do not conflict with the extension.
 - Package status: this repository is not published as an npm package; npm
-  scripts are for local development, installation, and manual release packaging.
+  scripts are for local development, installation, and testing.
 
 ## Requirements
 
@@ -43,12 +44,59 @@ development tools that support stdio MCP servers.
 
 ## Installation
 
+### Zed Extension
+
 Published builds are installed through Zed's extension registry. For local
 development, clone this repository and load it through Zed's development
 extension workflow.
 
 Zed starts `server/index.js` with its bundled Node.js runtime. A separate Node.js
 installation is only required for local development or standalone server tests.
+
+### Standalone MCP Server
+
+For Claude, Codex, Cursor, and other MCP clients, use the standalone
+`redmine-mcp-server` distribution. Its Homebrew formula should point at the
+standalone server release, not this Zed extension repository:
+
+```sh
+brew install weirdo-adam/tap/redmine-mcp-server
+```
+
+Then configure clients to run `redmine-mcp-server` with the required
+`REDMINE_*` environment variables.
+
+The local install script is a development fallback when working from this
+checkout:
+
+```sh
+scripts/install-local.sh
+```
+
+### Zed With Homebrew Server
+
+The Zed extension uses the bundled server by default. To force Zed to use a
+Homebrew-installed server instead, override the command:
+
+```json
+{
+  "context_servers": {
+    "redmine": {
+      "command": {
+        "path": "/opt/homebrew/bin/redmine-mcp-server",
+        "arguments": []
+      },
+      "settings": {
+        "REDMINE_BASE_URL": "https://redmine.example.com",
+        "REDMINE_API_KEY": "your-api-key",
+        "REDMINE_MCP_READ_ONLY": false
+      }
+    }
+  }
+}
+```
+
+Use `/usr/local/bin/redmine-mcp-server` on Intel macOS Homebrew installations.
 
 ## Configuration
 
@@ -103,17 +151,10 @@ node server/index.js
 
 The server uses the standard stdio MCP transport. It can be configured in Zed,
 Claude Code or Claude Desktop, Codex, and other local MCP clients by launching
-`node /absolute/path/to/server/index.js` with the `REDMINE_*` environment
-variables.
+`redmine-mcp-server` with the `REDMINE_*` environment variables.
 
 See [docs/client-configuration.md](docs/client-configuration.md) for client
 configuration examples.
-
-Local one-command install for non-Zed MCP clients:
-
-```sh
-scripts/install-local.sh
-```
 
 ## Security
 
@@ -155,21 +196,14 @@ Rust clippy, and the Zed WASI target check.
 The MCP stdio transport uses newline-delimited JSON-RPC on stdout. Logs and
 diagnostics must be written to stderr.
 
-## Releases
+## Publishing
 
-GitHub Actions publishes releases from `main`. When the version in
-`extension.toml` does not already have a remote tag and GitHub Release, the
-release workflow creates `v<version>`, builds the package, and uploads the
-archive plus checksum as release assets.
+This repository does not publish a plugin tarball. Zed extension publishing is
+handled through Zed's extension registry, where the extension entry points at a
+repository commit and Zed builds the extension package.
 
-To build the same release package locally:
-
-```sh
-scripts/package-release.sh
-```
-
-The archive includes the Zed extension files, the standalone MCP server, docs,
-and the local install script.
+Standalone `redmine-mcp-server` GitHub Releases and Homebrew formula updates
+belong to the standalone server distribution, not this plugin repository.
 
 ## Support
 

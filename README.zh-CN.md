@@ -27,11 +27,13 @@ Node.js 运行时启动随附的 stdio MCP server。随附的 `server/index.js` 
 
 ## 项目定位
 
-- 主要发布形态：Zed 扩展。
-- 内置运行时：独立 Redmine stdio MCP server。
-- 补充使用方式：Claude、Codex 以及其他 agent 工具的本地 MCP 配置。
+- 主要发布形态：内置 Redmine stdio MCP server 的 Zed 扩展。
+- 独立发布形态：供 Homebrew 和其他 MCP 客户端使用的
+  `redmine-mcp-server`。
+- Zed 扩展默认使用随附 server，保持开箱即用。Homebrew 安装在独立路径，
+  不会和扩展冲突。
 - 包状态：本仓库不作为 npm package 发布；npm scripts 用于本地开发、安装和
-  手动 release 打包。
+  测试。
 
 ## 运行要求
 
@@ -41,11 +43,57 @@ Node.js 运行时启动随附的 stdio MCP server。随附的 `server/index.js` 
 
 ## 安装
 
+### Zed 扩展
+
 发布版本通过 Zed 扩展市场安装。本地开发时，clone 本仓库并按 Zed 开发扩展流程
 从本地 checkout 加载。
 
 Zed 会使用内置 Node.js 运行时启动 `server/index.js`。只有本地开发或单独测试
 stdio server 时才需要额外安装 Node.js。
+
+### 独立 MCP Server
+
+Claude、Codex、Cursor 以及其他 MCP 客户端应使用独立的
+`redmine-mcp-server` 分发。Homebrew formula 应指向独立 server 的 release，
+不要指向这个 Zed 扩展仓库：
+
+```sh
+brew install weirdo-adam/tap/redmine-mcp-server
+```
+
+然后在客户端中配置运行 `redmine-mcp-server`，并传入所需的 `REDMINE_*`
+环境变量。
+
+从当前 checkout 开发时，也可以使用本地安装脚本作为 fallback：
+
+```sh
+scripts/install-local.sh
+```
+
+### Zed 使用 Homebrew Server
+
+Zed 扩展默认使用随附 server。如果希望强制 Zed 使用 Homebrew 安装的 server，
+可以覆盖 command：
+
+```json
+{
+  "context_servers": {
+    "redmine": {
+      "command": {
+        "path": "/opt/homebrew/bin/redmine-mcp-server",
+        "arguments": []
+      },
+      "settings": {
+        "REDMINE_BASE_URL": "https://redmine.example.com",
+        "REDMINE_API_KEY": "your-api-key",
+        "REDMINE_MCP_READ_ONLY": false
+      }
+    }
+  }
+}
+```
+
+Intel macOS 的 Homebrew 路径通常是 `/usr/local/bin/redmine-mcp-server`。
 
 ## 配置
 
@@ -98,17 +146,11 @@ node server/index.js
 ## Agent 客户端配置
 
 本服务使用标准 stdio MCP transport。Zed、Claude Code 或 Claude Desktop、
-Codex，以及其他本地 MCP 客户端都可以通过启动
-`node /absolute/path/to/server/index.js` 并传入 `REDMINE_*` 环境变量来使用。
+Codex，以及其他本地 MCP 客户端都可以通过启动 `redmine-mcp-server` 并传入
+`REDMINE_*` 环境变量来使用。
 
 客户端配置示例见
 [docs/client-configuration.zh-CN.md](docs/client-configuration.zh-CN.md)。
-
-非 Zed MCP 客户端的一键本地安装：
-
-```sh
-scripts/install-local.sh
-```
 
 ## 安全
 
@@ -148,19 +190,13 @@ scripts/check.sh
 MCP stdio transport 使用 stdout 输出按行分隔的 JSON-RPC 消息。日志和诊断信息
 必须写入 stderr。
 
-## Release
+## 发布
 
-GitHub Actions 会从 `main` 自动发布 release。当 `extension.toml` 中的版本还
-没有对应的远端 tag 和 GitHub Release 时，release workflow 会创建
-`v<version>`、构建发布包，并上传 archive 和校验文件。
+本仓库不发布插件 tarball。Zed 扩展发布通过 Zed 扩展市场完成：扩展条目指向
+具体仓库提交，由 Zed 侧构建扩展包。
 
-本地也可以构建同样的发布包：
-
-```sh
-scripts/package-release.sh
-```
-
-发布包包含 Zed 扩展文件、独立 MCP server、文档和本地安装脚本。
+独立 `redmine-mcp-server` 的 GitHub Releases 和 Homebrew formula 更新应放在
+独立 server 分发中，不放在这个插件仓库里。
 
 ## 支持
 
