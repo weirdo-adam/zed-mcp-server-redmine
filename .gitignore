@@ -2,3 +2,5 @@
 /node_modules/
 /.zed/
 .DS_Store
+local/
+/extension.wasm
