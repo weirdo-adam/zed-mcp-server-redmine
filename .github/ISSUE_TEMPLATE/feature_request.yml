@@ -1,0 +1,42 @@
+name: Feature request
+description: Propose a new Redmine MCP tool or extension behavior.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For new API coverage, check docs/api-coverage.md before filing.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or workflow
+      description: Describe the Redmine workflow this would support.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Include proposed tool names and whether the operation is read-only or write-capable.
+    validations:
+      required: true
+  - type: dropdown
+    id: risk
+    attributes:
+      label: Operation risk
+      options:
+        - Read-only
+        - Write operation
+        - Administrative operation
+        - File upload or download
+    validations:
+      required: true
+  - type: textarea
+    id: api
+    attributes:
+      label: Redmine REST API reference
+      description: Link the relevant Redmine API documentation when possible.
+    validations:
+      required: false
