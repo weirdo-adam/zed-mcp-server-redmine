@@ -1,5 +1,7 @@
 # Redmine MCP Server for Zed
 
+[简体中文](README.zh-CN.md)
+
 This extension follows Zed's
 [MCP extension model](https://zed.dev/docs/extensions/mcp-extensions), registers
 a `redmine` MCP context server, and runs a bundled Node.js stdio MCP server.
