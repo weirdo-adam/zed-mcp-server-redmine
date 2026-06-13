@@ -2,13 +2,14 @@
 
 [简体中文](README.zh-CN.md)
 
-This extension follows Zed's
+This Zed extension follows the
 [MCP extension model](https://zed.dev/docs/extensions/mcp-extensions), registers
-a `redmine` MCP context server, and runs a bundled Node.js stdio MCP server.
+a `redmine` MCP context server, and starts the bundled Node.js stdio MCP server.
 
 ## Configuration
 
-Install the directory as a Zed dev extension, then configure:
+After installing the Zed extension, configure the Redmine context server in Zed
+settings:
 
 ```json
 {
@@ -24,14 +25,13 @@ Install the directory as a Zed dev extension, then configure:
 }
 ```
 
-The extension passes configured settings to the bundled server as canonical
-`REDMINE_*` environment variables. The server also reads the same variables
-directly from the process environment, so the same binary can be run outside Zed.
+The extension maps Zed settings to the canonical `REDMINE_*` environment
+variables consumed by the bundled server. The same variables can also be used
+when running the server outside Zed.
 
-Use the `REDMINE_*` keys below in Zed settings and process environments. The
-extension passes those settings to the bundled server as environment variables.
-Optional tool groups are enabled by default; add `REDMINE_MCP_DISABLE_*`
-settings only when a workflow does not need that group or a plugin is missing.
+Optional tool groups are enabled by default. Use `REDMINE_MCP_DISABLE_*`
+settings to reduce the exposed tool set or to disable features that depend on
+unavailable Redmine plugins.
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
@@ -55,10 +55,9 @@ export REDMINE_MCP_READ_ONLY=true
 node server/index.js
 ```
 
-`REDMINE_MCP_READ_ONLY=true` is the safest mode for agents that should inspect
-Redmine but never mutate it. `REDMINE_SILENT_WRITES=true` only changes write
-notification/output behavior; it does not prevent writes. Individual write tools
-also accept `silent` and `notify` arguments.
+`REDMINE_MCP_READ_ONLY=true` disables all write tools. `REDMINE_SILENT_WRITES=true`
+changes write notification and response behavior only; it does not block write
+operations. Write tools also accept per-call `silent` and `notify` arguments.
 
 ## Available Tools
 
@@ -67,8 +66,8 @@ Core features are always active.
 Issues:
 
 - `redmine_list_issues` - List issues with Redmine filters.
-- `redmine_create_issue` - Create a new issue.
-- `redmine_get_issue` - Show issue details.
+- `redmine_create_issue` - Create an issue.
+- `redmine_get_issue` - Get issue details.
 - `redmine_update_issue` - Update an issue and optionally suppress email notifications.
 
 Search and metadata:
