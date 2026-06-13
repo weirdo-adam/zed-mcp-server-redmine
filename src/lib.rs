@@ -92,6 +92,9 @@ fn env_from_settings(settings: &zed::serde_json::Value) -> Vec<(String, String)>
         ("REDMINE_MCP_READ_ONLY", "REDMINE_MCP_READ_ONLY"),
         ("redmine_mcp_read_only", "REDMINE_MCP_READ_ONLY"),
         ("read_only", "REDMINE_MCP_READ_ONLY"),
+        ("REDMINE_MCP_ENABLE_DELETES", "REDMINE_MCP_ENABLE_DELETES"),
+        ("redmine_mcp_enable_deletes", "REDMINE_MCP_ENABLE_DELETES"),
+        ("enable_deletes", "REDMINE_MCP_ENABLE_DELETES"),
         (
             "REDMINE_MCP_DISABLE_ATTACHMENTS",
             "REDMINE_MCP_DISABLE_ATTACHMENTS",
@@ -137,6 +140,9 @@ fn env_from_settings(settings: &zed::serde_json::Value) -> Vec<(String, String)>
             "REDMINE_MCP_DISABLE_VERSIONS",
         ),
         ("disable_versions", "REDMINE_MCP_DISABLE_VERSIONS"),
+        ("REDMINE_MCP_DISABLE_WIKI", "REDMINE_MCP_DISABLE_WIKI"),
+        ("redmine_mcp_disable_wiki", "REDMINE_MCP_DISABLE_WIKI"),
+        ("disable_wiki", "REDMINE_MCP_DISABLE_WIKI"),
         (
             "REDMINE_MCP_DISABLE_WATCHERS",
             "REDMINE_MCP_DISABLE_WATCHERS",
@@ -184,7 +190,7 @@ const INSTALLATION_INSTRUCTIONS: &str = r#"Set `REDMINE_BASE_URL` and `REDMINE_A
 
 Core issue, search, and metadata tools are always active. Optional tool groups are enabled by default; add `REDMINE_MCP_DISABLE_*` settings only when a group or plugin is not needed.
 
-Use `REDMINE_MCP_READ_ONLY=true` when the agent should inspect Redmine without making changes."#;
+Use `REDMINE_MCP_READ_ONLY=true` when the agent should inspect Redmine without making changes. Destructive delete/remove tools are disabled by default; expose them only with `REDMINE_MCP_ENABLE_DELETES=true`."#;
 
 const DEFAULT_SETTINGS: &str = r#"{
   "REDMINE_BASE_URL": "https://redmine.example.com",
@@ -210,6 +216,11 @@ const SETTINGS_SCHEMA: &str = r#"{
       "default": false,
       "description": "When true, write tools are hidden from tools/list and rejected if called directly."
     },
+    "REDMINE_MCP_ENABLE_DELETES": {
+      "type": "boolean",
+      "default": false,
+      "description": "When true, destructive delete/remove tools are exposed. These tools are disabled by default and still require REDMINE_MCP_READ_ONLY=false."
+    },
     "REDMINE_MCP_DISABLE_ATTACHMENTS": {
       "type": "boolean",
       "default": false,
@@ -234,6 +245,11 @@ const SETTINGS_SCHEMA: &str = r#"{
       "type": "boolean",
       "default": false,
       "description": "Disable version and milestone tools."
+    },
+    "REDMINE_MCP_DISABLE_WIKI": {
+      "type": "boolean",
+      "default": false,
+      "description": "Disable wiki page tools."
     },
     "REDMINE_MCP_DISABLE_WATCHERS": {
       "type": "boolean",
@@ -272,11 +288,13 @@ mod tests {
             "REDMINE_BASE_URL": "https://redmine.example.com/",
             "REDMINE_API_KEY": "secret",
             "REDMINE_MCP_READ_ONLY": true,
+            "REDMINE_MCP_ENABLE_DELETES": true,
             "REDMINE_MCP_DISABLE_ATTACHMENTS": true,
             "REDMINE_MCP_DISABLE_CHECKLISTS": true,
             "REDMINE_MCP_DISABLE_RELATIONS": true,
             "REDMINE_MCP_DISABLE_TIME_ENTRIES": true,
             "REDMINE_MCP_DISABLE_VERSIONS": true,
+            "REDMINE_MCP_DISABLE_WIKI": true,
             "REDMINE_MCP_DISABLE_WATCHERS": true,
             "REDMINE_MCP_ATTACHMENT_MAX_BYTES": 2048,
             "REDMINE_SILENT_WRITES": true,
@@ -286,11 +304,13 @@ mod tests {
         assert_env(&env, "REDMINE_BASE_URL", "https://redmine.example.com/");
         assert_env(&env, "REDMINE_API_KEY", "secret");
         assert_env(&env, "REDMINE_MCP_READ_ONLY", "true");
+        assert_env(&env, "REDMINE_MCP_ENABLE_DELETES", "true");
         assert_env(&env, "REDMINE_MCP_DISABLE_ATTACHMENTS", "true");
         assert_env(&env, "REDMINE_MCP_DISABLE_CHECKLISTS", "true");
         assert_env(&env, "REDMINE_MCP_DISABLE_RELATIONS", "true");
         assert_env(&env, "REDMINE_MCP_DISABLE_TIME_ENTRIES", "true");
         assert_env(&env, "REDMINE_MCP_DISABLE_VERSIONS", "true");
+        assert_env(&env, "REDMINE_MCP_DISABLE_WIKI", "true");
         assert_env(&env, "REDMINE_MCP_DISABLE_WATCHERS", "true");
         assert_env(&env, "REDMINE_MCP_ATTACHMENT_MAX_BYTES", "2048");
         assert_env(&env, "REDMINE_SILENT_WRITES", "true");

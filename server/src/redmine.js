@@ -30,11 +30,13 @@ export function createConfig(env = process.env, fetchImpl = globalThis.fetch) {
       relations: parseBoolean(env.REDMINE_MCP_DISABLE_RELATIONS, false),
       timeEntries: parseBoolean(env.REDMINE_MCP_DISABLE_TIME_ENTRIES, false),
       versions: parseBoolean(env.REDMINE_MCP_DISABLE_VERSIONS, false),
+      wiki: parseBoolean(env.REDMINE_MCP_DISABLE_WIKI, false),
       watchers: parseBoolean(env.REDMINE_MCP_DISABLE_WATCHERS, false),
     },
     silentWrites: parseBoolean(env.REDMINE_SILENT_WRITES, false),
-    attachmentMaxBytes: Number(env.REDMINE_MCP_ATTACHMENT_MAX_BYTES || 10485760),
-    timeoutMs: Number(env.REDMINE_TIMEOUT_MS || 30000),
+    enableDeletes: parseBoolean(env.REDMINE_MCP_ENABLE_DELETES, false),
+    attachmentMaxBytes: positiveNumber(env.REDMINE_MCP_ATTACHMENT_MAX_BYTES, 10485760),
+    timeoutMs: positiveNumber(env.REDMINE_TIMEOUT_MS, 30000),
     fetchImpl,
   };
 }
@@ -54,10 +56,12 @@ export class RedmineClient {
         relations: false,
         timeEntries: false,
         versions: false,
+        wiki: false,
         watchers: false,
         ...(config.disabledFeatures || {}),
       },
-      timeoutMs: Number(config.timeoutMs || 30000),
+      timeoutMs: positiveNumber(config.timeoutMs, 30000),
+      enableDeletes: parseBoolean(config.enableDeletes, false),
     };
     if (typeof this.config.fetchImpl !== "function") {
       throw new Error("Redmine MCP server requires a fetch implementation");
@@ -186,4 +190,9 @@ async function parseResponseBody(response, responseType, responseOk) {
 
 function trimTrailingSlash(value) {
   return String(value).replace(/\/+$/, "");
+}
+
+function positiveNumber(value, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }

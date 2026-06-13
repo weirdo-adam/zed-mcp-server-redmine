@@ -39,6 +39,9 @@ cp "$REPO_ROOT/CONTRIBUTING.md" "$STAGE_DIR/CONTRIBUTING.md"
 cp "$REPO_ROOT/server/index.js" "$STAGE_DIR/server/index.js"
 cp "$REPO_ROOT/server/src/"*.js "$STAGE_DIR/server/src/"
 cp "$REPO_ROOT/docs/"*.md "$STAGE_DIR/docs/"
+if [ -d "$REPO_ROOT/docs/assets" ]; then
+  cp -R "$REPO_ROOT/docs/assets" "$STAGE_DIR/docs/assets"
+fi
 cp "$REPO_ROOT/scripts/install-local.sh" "$STAGE_DIR/scripts/install-local.sh"
 
 chmod +x "$STAGE_DIR/scripts/install-local.sh"

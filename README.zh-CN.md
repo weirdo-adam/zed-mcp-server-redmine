@@ -1,10 +1,29 @@
-# Redmine MCP Server for Zed
+<p align="center">
+  <img src="docs/assets/readme-hero.svg" alt="Redmine MCP Server for Zed" width="100%">
+</p>
 
-[English](README.md)
+<p align="center">
+  <a href="README.md">English</a>
+  ·
+  <a href="docs/client-configuration.zh-CN.md">客户端配置</a>
+  ·
+  <a href="docs/api-coverage.md">API 覆盖</a>
+  ·
+  <a href="SECURITY.md">安全</a>
+</p>
+
+# Redmine MCP Server for Zed
 
 一个 Zed 扩展，用于注册 `redmine` MCP context server，并通过 Zed 内置
 Node.js 运行时启动随附的 stdio MCP server。随附的 `server/index.js` 入口
 也可以作为本地 MCP server，用于支持 stdio MCP 的 agent 开发工具。
+
+<p>
+  <img alt="Version 0.1.0" src="https://img.shields.io/badge/version-0.1.0-f25f4c">
+  <img alt="License MIT" src="https://img.shields.io/badge/license-MIT-19c37d">
+  <img alt="Node 18.17 or newer" src="https://img.shields.io/badge/node-%3E%3D18.17-243447">
+  <img alt="Zed MCP extension" src="https://img.shields.io/badge/Zed-MCP_extension-7dd3fc">
+</p>
 
 ## 项目定位
 
@@ -53,11 +72,13 @@ stdio server 时才需要额外安装 Node.js。
 | `REDMINE_BASE_URL` | 是 | 无 | Redmine 实例地址。 |
 | `REDMINE_API_KEY` | 是 | 无 | Redmine REST API key。 |
 | `REDMINE_MCP_READ_ONLY` | 否 | `false` | 隐藏并拒绝写工具。 |
+| `REDMINE_MCP_ENABLE_DELETES` | 否 | `false` | 暴露破坏性删除/移除工具。删除和移除工具默认禁用。 |
 | `REDMINE_MCP_DISABLE_ATTACHMENTS` | 否 | `false` | 禁用附件工具。 |
 | `REDMINE_MCP_DISABLE_CHECKLISTS` | 否 | `false` | 禁用检查清单工具。 |
 | `REDMINE_MCP_DISABLE_RELATIONS` | 否 | `false` | 禁用问题关联工具。 |
 | `REDMINE_MCP_DISABLE_TIME_ENTRIES` | 否 | `false` | 禁用工时工具。 |
 | `REDMINE_MCP_DISABLE_VERSIONS` | 否 | `false` | 禁用版本工具。 |
+| `REDMINE_MCP_DISABLE_WIKI` | 否 | `false` | 禁用 Wiki 页面工具。 |
 | `REDMINE_MCP_DISABLE_WATCHERS` | 否 | `false` | 禁用关注者工具。 |
 | `REDMINE_MCP_ATTACHMENT_MAX_BYTES` | 否 | `10485760` | MCP 返回的附件上传/下载最大载荷字节数。 |
 | `REDMINE_SILENT_WRITES` | 否 | `false` | 返回精简写入结果，并发送 `notify=false`。 |
@@ -100,19 +121,20 @@ scripts/install-local.sh
 ## 可用工具
 
 工具 schema 通过 MCP `tools/list` 返回。
-Redmine REST API 覆盖状态和计划补充项见
+Redmine REST API 覆盖状态和未支持范围见
 [docs/api-coverage.md](docs/api-coverage.md)。
 
 | 分组 | 工具 | 可用性 | 说明 |
 | --- | --- | --- | --- |
-| 问题 | `redmine_list_issues`、`redmine_get_issue`、`redmine_create_issue`、`redmine_update_issue` | 始终启用 | 写工具在只读模式下隐藏。 |
-| 搜索和元数据 | `redmine_search`、`redmine_list_projects`、`redmine_get_project`、`redmine_list_issue_statuses`、`redmine_list_trackers`、`redmine_list_issue_priorities`、`redmine_list_issue_categories`、`redmine_list_custom_fields`、`redmine_list_queries`、`redmine_list_users`、`redmine_get_current_user` | 始终启用 | 只读。 |
-| 附件 | `redmine_get_attachment`、`redmine_download_attachment`、`redmine_upload_attachment` | 使用 `REDMINE_MCP_DISABLE_ATTACHMENTS=true` 禁用。 | 上传工具在只读模式下隐藏；下载返回 base64 或 UTF-8 文本。 |
-| 问题关联 | `redmine_list_issue_relations`、`redmine_get_issue_relation`、`redmine_add_issue_relation`、`redmine_delete_issue_relation` | 使用 `REDMINE_MCP_DISABLE_RELATIONS=true` 禁用。 | 写工具在只读模式下隐藏。 |
-| 检查清单 | `redmine_list_checklists`、`redmine_add_checklist_item`、`redmine_update_checklist_item`、`redmine_delete_checklist_item` | 使用 `REDMINE_MCP_DISABLE_CHECKLISTS=true` 禁用。 | 需要 Redmine Checklists。 |
-| 工时 | `redmine_list_time_entries`、`redmine_get_time_entry`、`redmine_add_time_entry`、`redmine_update_time_entry`、`redmine_delete_time_entry`、`redmine_list_time_entry_activities` | 使用 `REDMINE_MCP_DISABLE_TIME_ENTRIES=true` 禁用。 | 写工具在只读模式下隐藏。 |
-| 版本 | `redmine_list_versions`、`redmine_get_version`、`redmine_create_version`、`redmine_update_version`、`redmine_delete_version` | 使用 `REDMINE_MCP_DISABLE_VERSIONS=true` 禁用。 | 写工具在只读模式下隐藏。 |
-| 关注者 | `redmine_list_watchers`、`redmine_add_watcher`、`redmine_remove_watcher` | 使用 `REDMINE_MCP_DISABLE_WATCHERS=true` 禁用。 | 写工具在只读模式下隐藏。 |
+| 问题 | `redmine_list_issues`、`redmine_get_issue`、`redmine_create_issue`、`redmine_update_issue`、`redmine_delete_issue` | 核心问题工具始终启用。`redmine_delete_issue` 需要 `REDMINE_MCP_ENABLE_DELETES=true`。 | 写工具在只读模式下隐藏。删除问题是破坏性操作，默认禁用。 |
+| 搜索和元数据 | `redmine_search`、`redmine_list_projects`、`redmine_get_project`、`redmine_list_project_memberships`、`redmine_get_project_membership`、`redmine_list_issue_statuses`、`redmine_list_trackers`、`redmine_list_issue_priorities`、`redmine_list_issue_categories`、`redmine_list_custom_fields`、`redmine_list_queries`、`redmine_list_users`、`redmine_get_current_user` | 始终启用 | 只读。项目成员关系工具只提供读取能力。 |
+| 附件 | `redmine_get_attachment`、`redmine_download_attachment`、`redmine_upload_attachment`、`redmine_delete_attachment` | 使用 `REDMINE_MCP_DISABLE_ATTACHMENTS=true` 禁用。`redmine_delete_attachment` 还需要 `REDMINE_MCP_ENABLE_DELETES=true`。 | 上传和显式开启的删除工具在只读模式下隐藏；下载返回 base64 或 UTF-8 文本。删除附件是破坏性操作，默认禁用。 |
+| Wiki 页面 | `redmine_list_wiki_pages`、`redmine_get_wiki_page` | 使用 `REDMINE_MCP_DISABLE_WIKI=true` 禁用。 | 只读。支持列出页面，以及按标题或版本读取页面。 |
+| 问题关联 | `redmine_list_issue_relations`、`redmine_get_issue_relation`、`redmine_add_issue_relation`、`redmine_delete_issue_relation` | 使用 `REDMINE_MCP_DISABLE_RELATIONS=true` 禁用。删除需要 `REDMINE_MCP_ENABLE_DELETES=true`。 | 写工具在只读模式下隐藏。 |
+| 检查清单 | `redmine_list_checklists`、`redmine_add_checklist_item`、`redmine_update_checklist_item`、`redmine_delete_checklist_item` | 使用 `REDMINE_MCP_DISABLE_CHECKLISTS=true` 禁用。删除需要 `REDMINE_MCP_ENABLE_DELETES=true`。 | 需要 Redmine Checklists。 |
+| 工时 | `redmine_list_time_entries`、`redmine_get_time_entry`、`redmine_add_time_entry`、`redmine_update_time_entry`、`redmine_delete_time_entry`、`redmine_list_time_entry_activities` | 使用 `REDMINE_MCP_DISABLE_TIME_ENTRIES=true` 禁用。删除需要 `REDMINE_MCP_ENABLE_DELETES=true`。 | 写工具在只读模式下隐藏。 |
+| 版本 | `redmine_list_versions`、`redmine_get_version`、`redmine_create_version`、`redmine_update_version`、`redmine_delete_version` | 使用 `REDMINE_MCP_DISABLE_VERSIONS=true` 禁用。删除需要 `REDMINE_MCP_ENABLE_DELETES=true`。 | 写工具在只读模式下隐藏。 |
+| 关注者 | `redmine_list_watchers`、`redmine_add_watcher`、`redmine_remove_watcher` | 使用 `REDMINE_MCP_DISABLE_WATCHERS=true` 禁用。移除需要 `REDMINE_MCP_ENABLE_DELETES=true`。 | 写工具在只读模式下隐藏。 |
 
 ## 开发
 

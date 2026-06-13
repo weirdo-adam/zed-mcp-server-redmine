@@ -22,7 +22,9 @@ const silentWriteProperties = {
 const WRITE_TOOLS = new Set([
   "redmine_create_issue",
   "redmine_update_issue",
+  "redmine_delete_issue",
   "redmine_upload_attachment",
+  "redmine_delete_attachment",
   "redmine_add_issue_relation",
   "redmine_delete_issue_relation",
   "redmine_add_checklist_item",
@@ -38,11 +40,22 @@ const WRITE_TOOLS = new Set([
   "redmine_remove_watcher",
 ]);
 
+const DELETE_TOOLS = new Set([
+  "redmine_delete_issue",
+  "redmine_delete_attachment",
+  "redmine_delete_issue_relation",
+  "redmine_delete_checklist_item",
+  "redmine_delete_time_entry",
+  "redmine_delete_version",
+  "redmine_remove_watcher",
+]);
+
 const FEATURE_TOOLS = {
   attachments: new Set([
     "redmine_get_attachment",
     "redmine_download_attachment",
     "redmine_upload_attachment",
+    "redmine_delete_attachment",
   ]),
   checklists: new Set([
     "redmine_list_checklists",
@@ -71,6 +84,7 @@ const FEATURE_TOOLS = {
     "redmine_update_version",
     "redmine_delete_version",
   ]),
+  wiki: new Set(["redmine_list_wiki_pages", "redmine_get_wiki_page"]),
   watchers: new Set([
     "redmine_list_watchers",
     "redmine_add_watcher",
@@ -84,11 +98,13 @@ const FEATURE_ENV = {
   relations: "REDMINE_MCP_DISABLE_RELATIONS",
   timeEntries: "REDMINE_MCP_DISABLE_TIME_ENTRIES",
   versions: "REDMINE_MCP_DISABLE_VERSIONS",
+  wiki: "REDMINE_MCP_DISABLE_WIKI",
   watchers: "REDMINE_MCP_DISABLE_WATCHERS",
 };
 
 const DEFAULT_ISSUE_INCLUDES = ["journals", "watchers", "checklists", "relations"];
 const DEFAULT_ATTACHMENT_MAX_BYTES = 10485760;
+const WIKI_INCLUDES = ["attachments"];
 const PROJECT_INCLUDES = [
   "trackers",
   "issue_categories",
@@ -108,7 +124,7 @@ export const TOOLS = [
   {
     name: "redmine_get_issue",
     description:
-      "Get one Redmine issue. Supports native includes for journals, watchers, checklists, relations, attachments, children, and changesets.",
+      "Get one Redmine issue. Supports native includes for journals, watchers, checklists, relations, attachments, children, changesets, and allowed_statuses.",
     inputSchema: objectSchema(
       {
         issue_id: integer("Redmine issue ID."),
@@ -124,6 +140,7 @@ export const TOOLS = [
               "attachments",
               "children",
               "changesets",
+              "allowed_statuses",
             ],
           },
           default: DEFAULT_ISSUE_INCLUDES,
@@ -203,6 +220,17 @@ export const TOOLS = [
         ...silentWriteProperties,
       },
       ["issue_id", "fields"]
+    ),
+  },
+  {
+    name: "redmine_delete_issue",
+    description: "Delete a Redmine issue. This is destructive and disabled in read-only mode.",
+    inputSchema: objectSchema(
+      {
+        issue_id: integer("Redmine issue ID."),
+        ...silentWriteProperties,
+      },
+      ["issue_id"]
     ),
   },
   {
@@ -303,6 +331,18 @@ export const TOOLS = [
         ...silentWriteProperties,
       },
       ["filename"]
+    ),
+  },
+  {
+    name: "redmine_delete_attachment",
+    description:
+      "Delete a Redmine attachment. This is destructive and disabled in read-only mode.",
+    inputSchema: objectSchema(
+      {
+        attachment_id: integer("Attachment ID."),
+        ...silentWriteProperties,
+      },
+      ["attachment_id"]
     ),
   },
   {
@@ -623,6 +663,62 @@ export const TOOLS = [
     ),
   },
   {
+    name: "redmine_list_project_memberships",
+    description: "List memberships for one Redmine project. Read-only.",
+    inputSchema: objectSchema(
+      {
+        project_id: stringOrInteger("Project identifier or numeric ID."),
+        offset: { type: "integer", minimum: 0 },
+        limit: readLimit,
+      },
+      ["project_id"]
+    ),
+  },
+  {
+    name: "redmine_get_project_membership",
+    description: "Get one Redmine project membership. Read-only.",
+    inputSchema: objectSchema(
+      {
+        membership_id: integer("Project membership ID."),
+      },
+      ["membership_id"]
+    ),
+  },
+  {
+    name: "redmine_list_wiki_pages",
+    description: "List wiki pages for one Redmine project. Read-only.",
+    inputSchema: objectSchema(
+      {
+        project_id: stringOrInteger("Project identifier or numeric ID."),
+      },
+      ["project_id"]
+    ),
+  },
+  {
+    name: "redmine_get_wiki_page",
+    description: "Get one Redmine wiki page, optionally at a specific version. Read-only.",
+    inputSchema: objectSchema(
+      {
+        project_id: stringOrInteger("Project identifier or numeric ID."),
+        title: {
+          type: "string",
+          minLength: 1,
+          description: "Wiki page title.",
+        },
+        version: integer("Optional wiki page version."),
+        include: {
+          type: "array",
+          description: "Associated wiki page data to include.",
+          items: {
+            type: "string",
+            enum: WIKI_INCLUDES,
+          },
+        },
+      },
+      ["project_id", "title"]
+    ),
+  },
+  {
     name: "redmine_list_issue_statuses",
     description: "List Redmine issue statuses.",
     inputSchema: objectSchema({}),
@@ -743,6 +839,14 @@ const handlers = {
     return writeResult(client, args, "update_issue", { issue_id: issueId }, response);
   },
 
+  async redmine_delete_issue(client, args) {
+    const issueId = required(args, "issue_id");
+    const response = await client.request("DELETE", `/issues/${encodeURIComponent(issueId)}.json`, {
+      query: writeQuery(client, args),
+    });
+    return writeResult(client, args, "delete_issue", { issue_id: issueId }, response);
+  },
+
   async redmine_search(client, args) {
     return unwrap(await client.request("GET", "/search.json", { query: filterArgs(args) }));
   },
@@ -860,6 +964,16 @@ const handlers = {
       uploadResponse,
       upload
     );
+  },
+
+  async redmine_delete_attachment(client, args) {
+    const attachmentId = required(args, "attachment_id");
+    const response = await client.request(
+      "DELETE",
+      `/attachments/${encodeURIComponent(attachmentId)}.json`,
+      { query: writeQuery(client, args) }
+    );
+    return writeResult(client, args, "delete_attachment", { attachment_id: attachmentId }, response);
   },
 
   async redmine_list_issue_relations(client, args) {
@@ -1132,6 +1246,50 @@ const handlers = {
     );
   },
 
+  async redmine_list_project_memberships(client, args) {
+    const projectId = required(args, "project_id");
+    return unwrap(
+      await client.request("GET", `/projects/${encodeURIComponent(projectId)}/memberships.json`, {
+        query: pickDefined(args, ["offset", "limit"]),
+      })
+    );
+  },
+
+  async redmine_get_project_membership(client, args) {
+    const membershipId = required(args, "membership_id");
+    return unwrap(
+      await client.request("GET", `/memberships/${encodeURIComponent(membershipId)}.json`)
+    );
+  },
+
+  async redmine_list_wiki_pages(client, args) {
+    const projectId = required(args, "project_id");
+    return unwrap(
+      await client.request("GET", `/projects/${encodeURIComponent(projectId)}/wiki/index.json`)
+    );
+  },
+
+  async redmine_get_wiki_page(client, args) {
+    const projectId = required(args, "project_id");
+    const title = required(args, "title");
+    const version = args.version;
+    const versionPath =
+      version !== undefined && version !== null && version !== ""
+        ? `/${encodeURIComponent(version)}`
+        : "";
+    return unwrap(
+      await client.request(
+        "GET",
+        `/projects/${encodeURIComponent(projectId)}/wiki/${encodeURIComponent(title)}${versionPath}.json`,
+        {
+          query: {
+            include: wikiIncludes(client, args.include),
+          },
+        }
+      )
+    );
+  },
+
   async redmine_list_issue_statuses(client) {
     return unwrap(await client.request("GET", "/issue_statuses.json"));
   },
@@ -1178,6 +1336,9 @@ export function listTools(config = {}) {
     if (disabledFeatureForTool(config, tool.name)) {
       return false;
     }
+    if (DELETE_TOOLS.has(tool.name) && !config.enableDeletes) {
+      return false;
+    }
     if (config.readOnly && WRITE_TOOLS.has(tool.name)) {
       return false;
     }
@@ -1193,6 +1354,11 @@ export async function callTool(client, name, args = {}) {
   const disabledFeature = disabledFeatureForTool(client.config, name);
   if (disabledFeature) {
     throw new Error(`${FEATURE_ENV[disabledFeature]} is enabled; tool ${name} is disabled`);
+  }
+  if (DELETE_TOOLS.has(name) && !(client.config && client.config.enableDeletes)) {
+    throw new Error(
+      `REDMINE_MCP_ENABLE_DELETES is not enabled; delete/remove tool ${name} is disabled`
+    );
   }
   if (client.config && client.config.readOnly && WRITE_TOOLS.has(name)) {
     throw new Error(`REDMINE_MCP_READ_ONLY is enabled; write tool ${name} is disabled`);
@@ -1350,6 +1516,18 @@ function issueIncludes(client, requestedIncludes) {
   return filtered.length ? filtered : undefined;
 }
 
+function wikiIncludes(client, requestedIncludes) {
+  const disabled = disabledFeatures(client.config);
+  const includes = Array.isArray(requestedIncludes) ? requestedIncludes : [];
+  const filtered = includes.filter((include) => {
+    if (include === "attachments") {
+      return !disabled.attachments;
+    }
+    return true;
+  });
+  return filtered.length ? filtered : undefined;
+}
+
 function disabledFeatureForTool(config = {}, toolName) {
   const disabled = disabledFeatures(config);
   for (const [feature, tools] of Object.entries(FEATURE_TOOLS)) {
@@ -1367,6 +1545,7 @@ function disabledFeatures(config = {}) {
     relations: false,
     timeEntries: false,
     versions: false,
+    wiki: false,
     watchers: false,
     ...(config.disabledFeatures || {}),
   };

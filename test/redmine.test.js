@@ -5,6 +5,16 @@ import test from "node:test";
 import { buildUrl, createConfig, createRedmineClient } from "../server/src/redmine.js";
 import { callTool, listTools } from "../server/src/tools.js";
 
+const DELETE_TOOL_NAMES = [
+  "redmine_delete_issue",
+  "redmine_delete_attachment",
+  "redmine_delete_issue_relation",
+  "redmine_delete_checklist_item",
+  "redmine_delete_time_entry",
+  "redmine_delete_version",
+  "redmine_remove_watcher",
+];
+
 test("buildUrl trims base URL and serializes array query values", () => {
   assert.equal(
     buildUrl("https://redmine.example.com/", "/issues/42.json", {
@@ -22,6 +32,10 @@ test("tool list includes core and optional Redmine tools", () => {
   assert.ok(names.has("redmine_download_attachment"));
   assert.ok(names.has("redmine_upload_attachment"));
   assert.ok(names.has("redmine_get_project"));
+  assert.ok(names.has("redmine_list_project_memberships"));
+  assert.ok(names.has("redmine_get_project_membership"));
+  assert.ok(names.has("redmine_list_wiki_pages"));
+  assert.ok(names.has("redmine_get_wiki_page"));
   assert.ok(names.has("redmine_list_trackers"));
   assert.ok(names.has("redmine_list_issue_priorities"));
   assert.ok(names.has("redmine_list_issue_categories"));
@@ -34,6 +48,16 @@ test("tool list includes core and optional Redmine tools", () => {
   assert.ok(names.has("redmine_get_time_entry"));
   assert.ok(names.has("redmine_list_versions"));
   assert.ok(names.has("redmine_add_watcher"));
+  for (const name of DELETE_TOOL_NAMES) {
+    assert.equal(names.has(name), false);
+  }
+});
+
+test("delete tools are exposed only when explicitly enabled", () => {
+  const names = new Set(listTools({ enableDeletes: true }).map((tool) => tool.name));
+  for (const name of DELETE_TOOL_NAMES) {
+    assert.ok(names.has(name));
+  }
 });
 
 test("config reads REDMINE_* values from the environment", () => {
@@ -41,11 +65,13 @@ test("config reads REDMINE_* values from the environment", () => {
     REDMINE_BASE_URL: "https://redmine.example.com/",
     REDMINE_API_KEY: "secret",
     REDMINE_MCP_READ_ONLY: "true",
+    REDMINE_MCP_ENABLE_DELETES: "true",
     REDMINE_MCP_DISABLE_ATTACHMENTS: "true",
     REDMINE_MCP_DISABLE_CHECKLISTS: "true",
     REDMINE_MCP_DISABLE_RELATIONS: "1",
     REDMINE_MCP_DISABLE_TIME_ENTRIES: "yes",
     REDMINE_MCP_DISABLE_VERSIONS: "on",
+    REDMINE_MCP_DISABLE_WIKI: "true",
     REDMINE_MCP_DISABLE_WATCHERS: "true",
     REDMINE_MCP_ATTACHMENT_MAX_BYTES: "2048",
     REDMINE_SILENT_WRITES: "yes",
@@ -55,12 +81,14 @@ test("config reads REDMINE_* values from the environment", () => {
   assert.equal(config.baseUrl, "https://redmine.example.com");
   assert.equal(config.apiKey, "secret");
   assert.equal(config.readOnly, true);
+  assert.equal(config.enableDeletes, true);
   assert.deepEqual(config.disabledFeatures, {
     attachments: true,
     checklists: true,
     relations: true,
     timeEntries: true,
     versions: true,
+    wiki: true,
     watchers: true,
   });
   assert.equal(config.attachmentMaxBytes, 2048);
@@ -78,12 +106,37 @@ test("legacy REDMINE_READ_ONLY is not supported", () => {
   assert.equal(config.readOnly, false);
 });
 
+test("invalid numeric environment settings fall back to safe defaults", () => {
+  const config = createConfig({
+    REDMINE_BASE_URL: "https://redmine.example.com/",
+    REDMINE_API_KEY: "secret",
+    REDMINE_TIMEOUT_MS: "not-a-number",
+    REDMINE_MCP_ATTACHMENT_MAX_BYTES: "0",
+  });
+
+  assert.equal(config.timeoutMs, 30000);
+  assert.equal(config.attachmentMaxBytes, 10485760);
+
+  const client = createRedmineClient({
+    ...config,
+    timeoutMs: -1,
+    attachmentMaxBytes: Number.NaN,
+    fetchImpl: async () => jsonResponse({ ok: true }),
+  });
+
+  assert.equal(client.config.timeoutMs, 30000);
+});
+
 test("read-only mode hides write tools and keeps read tools visible", () => {
-  const names = new Set(listTools({ readOnly: true }).map((tool) => tool.name));
+  const names = new Set(listTools({ readOnly: true, enableDeletes: true }).map((tool) => tool.name));
   assert.ok(names.has("redmine_get_issue"));
   assert.ok(names.has("redmine_search"));
   assert.ok(names.has("redmine_get_attachment"));
   assert.ok(names.has("redmine_download_attachment"));
+  assert.ok(names.has("redmine_list_project_memberships"));
+  assert.ok(names.has("redmine_get_project_membership"));
+  assert.ok(names.has("redmine_list_wiki_pages"));
+  assert.ok(names.has("redmine_get_wiki_page"));
   assert.ok(names.has("redmine_list_checklists"));
   assert.ok(names.has("redmine_list_time_entries"));
   assert.ok(names.has("redmine_get_time_entry"));
@@ -95,6 +148,9 @@ test("read-only mode hides write tools and keeps read tools visible", () => {
   assert.equal(names.has("redmine_add_time_entry"), false);
   assert.equal(names.has("redmine_create_version"), false);
   assert.equal(names.has("redmine_add_watcher"), false);
+  for (const name of DELETE_TOOL_NAMES) {
+    assert.equal(names.has(name), false);
+  }
 });
 
 test("read-only mode rejects direct write tool calls before Redmine requests", async () => {
@@ -111,6 +167,48 @@ test("read-only mode rejects direct write tool calls before Redmine requests", a
       }),
     /REDMINE_MCP_READ_ONLY is enabled/
   );
+  assert.equal(requests.length, 0);
+});
+
+test("read-only mode rejects destructive delete calls before Redmine requests", async () => {
+  const requests = [];
+  const client = createClient(requests, { readOnly: true, enableDeletes: true });
+
+  await assert.rejects(
+    () =>
+      callTool(client, "redmine_delete_issue", {
+        issue_id: 42,
+      }),
+    /REDMINE_MCP_READ_ONLY is enabled/
+  );
+  await assert.rejects(
+    () =>
+      callTool(client, "redmine_delete_attachment", {
+        attachment_id: 12,
+      }),
+    /REDMINE_MCP_READ_ONLY is enabled/
+  );
+  assert.equal(requests.length, 0);
+});
+
+test("delete tools are rejected by default before Redmine requests", async () => {
+  const requests = [];
+  const client = createClient(requests);
+
+  for (const [name, args] of [
+    ["redmine_delete_issue", { issue_id: 42 }],
+    ["redmine_delete_attachment", { attachment_id: 12 }],
+    ["redmine_delete_issue_relation", { relation_id: 7 }],
+    ["redmine_delete_checklist_item", { issue_id: 42, checklist_id: 9 }],
+    ["redmine_delete_time_entry", { time_entry_id: 5 }],
+    ["redmine_delete_version", { version_id: 3 }],
+    ["redmine_remove_watcher", { issue_id: 42, user_id: 11 }],
+  ]) {
+    await assert.rejects(
+      () => callTool(client, name, args),
+      /REDMINE_MCP_ENABLE_DELETES is not enabled/
+    );
+  }
   assert.equal(requests.length, 0);
 });
 
@@ -138,6 +236,7 @@ test("feature disable flags hide grouped tools", () => {
         relations: true,
         timeEntries: true,
         versions: true,
+        wiki: true,
         watchers: true,
       },
     }).map((tool) => tool.name)
@@ -153,6 +252,8 @@ test("feature disable flags hide grouped tools", () => {
   assert.equal(names.has("redmine_get_time_entry"), false);
   assert.equal(names.has("redmine_list_time_entry_activities"), false);
   assert.equal(names.has("redmine_list_versions"), false);
+  assert.equal(names.has("redmine_list_wiki_pages"), false);
+  assert.equal(names.has("redmine_get_wiki_page"), false);
   assert.equal(names.has("redmine_list_watchers"), false);
 });
 
@@ -161,6 +262,7 @@ test("feature disable flags reject direct tool calls before Redmine requests", a
   const client = createClient(requests, {
     disabledFeatures: {
       relations: true,
+      wiki: true,
     },
   });
 
@@ -172,6 +274,14 @@ test("feature disable flags reject direct tool calls before Redmine requests", a
         relation_type: "relates",
       }),
     /REDMINE_MCP_DISABLE_RELATIONS is enabled/
+  );
+  await assert.rejects(
+    () =>
+      callTool(client, "redmine_get_wiki_page", {
+        project_id: "demo",
+        title: "Start",
+      }),
+    /REDMINE_MCP_DISABLE_WIKI is enabled/
   );
   assert.equal(requests.length, 0);
 });
@@ -226,6 +336,33 @@ test("search targets the native Redmine search endpoint", async () => {
   assert.equal(url.searchParams.get("issues"), "true");
   assert.equal(url.searchParams.get("open_issues"), "true");
   assert.equal(url.searchParams.get("limit"), "10");
+});
+
+test("issue delete targets the native Redmine issue endpoint", async () => {
+  const requests = [];
+  const client = createClient(requests, {
+    enableDeletes: true,
+    fetchImpl: async (url, request) => {
+      requests.push({ url, request });
+      return jsonResponse(null, 204);
+    },
+  });
+
+  const result = await callTool(client, "redmine_delete_issue", {
+    issue_id: 42,
+    silent: true,
+  });
+
+  assert.equal(requests[0].url, "https://redmine.example.com/issues/42.json?notify=false");
+  assert.equal(requests[0].request.method, "DELETE");
+  assert.deepEqual(result, {
+    ok: true,
+    operation: "delete_issue",
+    target: {
+      issue_id: 42,
+    },
+    status: 204,
+  });
 });
 
 test("attachment metadata targets the native Redmine attachment endpoint", async () => {
@@ -402,6 +539,33 @@ test("attachment upload can attach the uploaded file to an issue", async () => {
   });
 });
 
+test("attachment delete targets the native Redmine attachment endpoint", async () => {
+  const requests = [];
+  const client = createClient(requests, {
+    enableDeletes: true,
+    fetchImpl: async (url, request) => {
+      requests.push({ url, request });
+      return jsonResponse(null, 204);
+    },
+  });
+
+  const result = await callTool(client, "redmine_delete_attachment", {
+    attachment_id: 12,
+    silent: true,
+  });
+
+  assert.equal(requests[0].url, "https://redmine.example.com/attachments/12.json?notify=false");
+  assert.equal(requests[0].request.method, "DELETE");
+  assert.deepEqual(result, {
+    ok: true,
+    operation: "delete_attachment",
+    target: {
+      attachment_id: 12,
+    },
+    status: 204,
+  });
+});
+
 test("metadata tools target native Redmine REST endpoints", async () => {
   const requests = [];
   const client = createClient(requests);
@@ -446,6 +610,68 @@ test("metadata tools target native Redmine REST endpoints", async () => {
     requests[6].url,
     "https://redmine.example.com/users/current.json?include=memberships%2Cgroups"
   );
+});
+
+test("project membership tools target native Redmine REST endpoints", async () => {
+  const requests = [];
+  const client = createClient(requests);
+
+  await callTool(client, "redmine_list_project_memberships", {
+    project_id: "demo",
+    limit: 10,
+  });
+  await callTool(client, "redmine_get_project_membership", {
+    membership_id: 8,
+  });
+
+  assert.equal(
+    requests[0].url,
+    "https://redmine.example.com/projects/demo/memberships.json?limit=10"
+  );
+  assert.equal(requests[1].url, "https://redmine.example.com/memberships/8.json");
+});
+
+test("wiki page tools target native Redmine REST endpoints", async () => {
+  const requests = [];
+  const client = createClient(requests);
+
+  await callTool(client, "redmine_list_wiki_pages", {
+    project_id: "demo",
+  });
+  await callTool(client, "redmine_get_wiki_page", {
+    project_id: "demo",
+    title: "Start page",
+    include: ["attachments"],
+  });
+  await callTool(client, "redmine_get_wiki_page", {
+    project_id: "demo",
+    title: "Start page",
+    version: 3,
+  });
+
+  assert.equal(requests[0].url, "https://redmine.example.com/projects/demo/wiki/index.json");
+  assert.equal(
+    requests[1].url,
+    "https://redmine.example.com/projects/demo/wiki/Start%20page.json?include=attachments"
+  );
+  assert.equal(requests[2].url, "https://redmine.example.com/projects/demo/wiki/Start%20page/3.json");
+});
+
+test("disabled attachments are removed from wiki page includes", async () => {
+  const requests = [];
+  const client = createClient(requests, {
+    disabledFeatures: {
+      attachments: true,
+    },
+  });
+
+  await callTool(client, "redmine_get_wiki_page", {
+    project_id: "demo",
+    title: "Start",
+    include: ["attachments"],
+  });
+
+  assert.equal(requests[0].url, "https://redmine.example.com/projects/demo/wiki/Start.json");
 });
 
 test("time entry read tools target Redmine time entry endpoints", async () => {
@@ -670,10 +896,12 @@ function createClient(requests, overrides = {}) {
       relations: false,
       timeEntries: false,
       versions: false,
+      wiki: false,
       watchers: false,
     },
     timeoutMs: 30000,
     silentWrites: false,
+    enableDeletes: false,
     fetchImpl: async (url, request) => {
       requests.push({ url, request });
       return new Response(JSON.stringify({ ok: true }), {

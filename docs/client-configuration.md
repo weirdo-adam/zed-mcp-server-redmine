@@ -196,6 +196,8 @@ Use the same stdio contract:
 - Arguments: `["/absolute/path/to/zed-mcp-server-redmine/server/index.js"]`
 - Required environment: `REDMINE_BASE_URL`, `REDMINE_API_KEY`
 - Optional safety setting: `REDMINE_MCP_READ_ONLY=true`
+- Optional destructive delete/remove opt-in: `REDMINE_MCP_ENABLE_DELETES=true`
+- Optional feature flag example: `REDMINE_MCP_DISABLE_WIKI=true`
 - Optional attachment limit: `REDMINE_MCP_ATTACHMENT_MAX_BYTES=10485760`
 
 See [api-coverage.md](api-coverage.md) for the exposed Redmine API scope and
