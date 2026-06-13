@@ -4,7 +4,22 @@
 
 这个 Zed 插件遵循 Zed 的
 [MCP 扩展模型](https://zed.dev/docs/extensions/mcp-extensions)，注册一个
-`redmine` MCP context server，并启动内置的 Node.js stdio MCP server。
+`redmine` MCP context server，并使用 Zed 的 Node.js 运行时启动内置 stdio
+MCP server。
+
+## 运行要求
+
+- Redmine 实例已开启 REST API。
+- Redmine API key 具备读取或更新你准备暴露给 agent 的资源权限。
+- 只有启用检查清单工具时，才需要安装 Redmine Checklists 插件。
+
+## 安装
+
+扩展发布后，可从 Zed 扩展市场安装。开发调试时，可以 clone 本仓库，并按 Zed
+的开发扩展流程从本地 checkout 加载。
+
+通过 Zed 加载时，扩展会使用 Zed 内置的 Node.js 运行时启动 `server/index.js`；
+正常使用不需要额外安装全局 Node.js。
 
 ## 配置
 
@@ -35,7 +50,7 @@
 | `REDMINE_BASE_URL` | 是 | 无 | Redmine 实例地址，例如 `https://redmine.example.com`。 |
 | `REDMINE_API_KEY` | 是 | 无 | Redmine REST API key。 |
 | `REDMINE_MCP_READ_ONLY` | 否 | `false` | 开启只读模式。写工具会从 `tools/list` 中隐藏，即使被直接调用也会被拒绝。 |
-| `REDMINE_MCP_DISABLE_CHECKLISTS` | 否 | `false` | 禁用检查清单工具。开启检查清单工具时需要安装 `redmine_checklists` 插件。 |
+| `REDMINE_MCP_DISABLE_CHECKLISTS` | 否 | `false` | 禁用检查清单工具。开启检查清单工具时需要安装 Redmine Checklists 插件。 |
 | `REDMINE_MCP_DISABLE_RELATIONS` | 否 | `false` | 禁用问题关联工具。 |
 | `REDMINE_MCP_DISABLE_TIME_ENTRIES` | 否 | `false` | 禁用工时工具。 |
 | `REDMINE_MCP_DISABLE_VERSIONS` | 否 | `false` | 禁用版本/里程碑工具。 |
@@ -43,7 +58,7 @@
 | `REDMINE_SILENT_WRITES` | 否 | `false` | 写工具返回更精简的成功结果，并在 Redmine 写请求中附加 `notify=false`。 |
 | `REDMINE_TIMEOUT_MS` | 否 | `30000` | HTTP 请求超时时间，单位毫秒。 |
 
-只通过环境变量运行的示例：
+本地 stdio server 运行示例：
 
 ```sh
 export REDMINE_BASE_URL="https://redmine.example.com"
@@ -56,9 +71,17 @@ node server/index.js
 只改变写入通知和返回内容，不会阻止写操作。写工具也支持通过 `silent` 和
 `notify` 参数进行单次调用级别的覆盖。
 
+## 安全说明
+
+如果配置的 API key 有对应权限，这个插件可以创建、更新和删除 Redmine 数据。
+如果当前项目只允许 agent 查看 Redmine，请先设置 `REDMINE_MCP_READ_ONLY=true`。
+
+建议使用权限范围尽量小的 Redmine API key。公开提交 bug 时，不要泄露 API key、
+私有问题内容或内部 Redmine 地址。
+
 ## 可用工具
 
-Core Features 默认始终开启。
+核心功能默认始终开启。
 
 问题：
 
@@ -74,7 +97,7 @@ Core Features 默认始终开启。
 - `redmine_list_issue_statuses` - 列出问题状态。
 - `redmine_list_users` - 列出用户。
 
-Optional Features 默认开启，并可按分组单独禁用。
+可选功能默认开启，并可按分组单独禁用。
 
 问题关联：
 
@@ -90,7 +113,7 @@ Optional Features 默认开启，并可按分组单独禁用。
 - `redmine_add_checklist_item` - 添加检查清单项。
 - `redmine_update_checklist_item` - 更新检查清单项。
 - `redmine_delete_checklist_item` - 删除检查清单项。
-- 需要 `redmine_checklists` 插件。使用 `REDMINE_MCP_DISABLE_CHECKLISTS=true` 禁用。
+- 需要 Redmine Checklists 插件。使用 `REDMINE_MCP_DISABLE_CHECKLISTS=true` 禁用。
 
 工时：
 
@@ -130,5 +153,14 @@ cargo check --target wasm32-wasip2
 scripts/check.sh
 ```
 
+CI 会在 pull request 和推送到 `main` 时运行同一组检查。
+
 MCP stdio transport 使用 stdout 输出按行分隔的 JSON-RPC 消息。日志和诊断
 信息必须写入 stderr，避免干扰协议通信。
+
+## 支持
+
+Bug 和功能请求请提交 GitHub issue。请附上扩展版本、Zed 版本、Redmine 版本、
+相关配置开关，以及脱敏后的 MCP server 日志。
+
+漏洞报告或凭证泄露问题请按 [SECURITY.md](SECURITY.md) 处理。
