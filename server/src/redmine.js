@@ -25,6 +25,7 @@ export function createConfig(env = process.env, fetchImpl = globalThis.fetch) {
     apiKey: env.REDMINE_API_KEY || "",
     readOnly: parseBoolean(env.REDMINE_MCP_READ_ONLY, false),
     disabledFeatures: {
+      attachments: parseBoolean(env.REDMINE_MCP_DISABLE_ATTACHMENTS, false),
       checklists: parseBoolean(env.REDMINE_MCP_DISABLE_CHECKLISTS, false),
       relations: parseBoolean(env.REDMINE_MCP_DISABLE_RELATIONS, false),
       timeEntries: parseBoolean(env.REDMINE_MCP_DISABLE_TIME_ENTRIES, false),
@@ -32,6 +33,7 @@ export function createConfig(env = process.env, fetchImpl = globalThis.fetch) {
       watchers: parseBoolean(env.REDMINE_MCP_DISABLE_WATCHERS, false),
     },
     silentWrites: parseBoolean(env.REDMINE_SILENT_WRITES, false),
+    attachmentMaxBytes: Number(env.REDMINE_MCP_ATTACHMENT_MAX_BYTES || 10485760),
     timeoutMs: Number(env.REDMINE_TIMEOUT_MS || 30000),
     fetchImpl,
   };
@@ -47,6 +49,7 @@ export class RedmineClient {
       ...config,
       baseUrl: trimTrailingSlash(config.baseUrl || ""),
       disabledFeatures: {
+        attachments: false,
         checklists: false,
         relations: false,
         timeEntries: false,
@@ -67,7 +70,7 @@ export class RedmineClient {
     const url = buildUrl(this.config.baseUrl, path, options.query);
     const headers = {
       "X-Redmine-API-Key": this.config.apiKey,
-      Accept: "application/json",
+      Accept: options.accept || "application/json",
     };
 
     const request = {
@@ -75,7 +78,10 @@ export class RedmineClient {
       headers,
     };
 
-    if (options.body !== undefined) {
+    if (options.rawBody !== undefined) {
+      headers["Content-Type"] = options.contentType || "application/octet-stream";
+      request.body = options.rawBody;
+    } else if (options.body !== undefined) {
       headers["Content-Type"] = "application/json";
       request.body = JSON.stringify(options.body);
     }
@@ -104,7 +110,7 @@ export class RedmineClient {
       }
     }
 
-    const payload = await parseResponseBody(response);
+    const payload = await parseResponseBody(response, options.responseType, response.ok);
     if (!response.ok) {
       throw new RedmineError(
         `Redmine ${method} ${path} returned HTTP ${response.status}`,
@@ -119,6 +125,7 @@ export class RedmineClient {
 
     return {
       status: response.status,
+      headers: response.headers,
       body: payload,
     };
   }
@@ -147,9 +154,13 @@ export function buildUrl(baseUrl, path, query = {}) {
   return url.toString();
 }
 
-async function parseResponseBody(response) {
+async function parseResponseBody(response, responseType, responseOk) {
   if (response.status === 204) {
     return null;
+  }
+
+  if (responseType === "buffer" && responseOk) {
+    return Buffer.from(await response.arrayBuffer());
   }
 
   const text = await response.text();

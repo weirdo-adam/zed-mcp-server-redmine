@@ -45,11 +45,13 @@ stdio server 时才需要额外安装 Node.js。
 | `REDMINE_BASE_URL` | 是 | 无 | Redmine 实例地址。 |
 | `REDMINE_API_KEY` | 是 | 无 | Redmine REST API key。 |
 | `REDMINE_MCP_READ_ONLY` | 否 | `false` | 隐藏并拒绝写工具。 |
+| `REDMINE_MCP_DISABLE_ATTACHMENTS` | 否 | `false` | 禁用附件工具。 |
 | `REDMINE_MCP_DISABLE_CHECKLISTS` | 否 | `false` | 禁用检查清单工具。 |
 | `REDMINE_MCP_DISABLE_RELATIONS` | 否 | `false` | 禁用问题关联工具。 |
 | `REDMINE_MCP_DISABLE_TIME_ENTRIES` | 否 | `false` | 禁用工时工具。 |
 | `REDMINE_MCP_DISABLE_VERSIONS` | 否 | `false` | 禁用版本工具。 |
 | `REDMINE_MCP_DISABLE_WATCHERS` | 否 | `false` | 禁用关注者工具。 |
+| `REDMINE_MCP_ATTACHMENT_MAX_BYTES` | 否 | `10485760` | MCP 返回的附件上传/下载最大载荷字节数。 |
 | `REDMINE_SILENT_WRITES` | 否 | `false` | 返回精简写入结果，并发送 `notify=false`。 |
 | `REDMINE_TIMEOUT_MS` | 否 | `30000` | HTTP 请求超时时间，单位毫秒。 |
 
@@ -97,6 +99,7 @@ Redmine REST API 覆盖状态和计划补充项见
 | --- | --- | --- | --- |
 | 问题 | `redmine_list_issues`、`redmine_get_issue`、`redmine_create_issue`、`redmine_update_issue` | 始终启用 | 写工具在只读模式下隐藏。 |
 | 搜索和元数据 | `redmine_search`、`redmine_list_projects`、`redmine_get_project`、`redmine_list_issue_statuses`、`redmine_list_trackers`、`redmine_list_issue_priorities`、`redmine_list_issue_categories`、`redmine_list_custom_fields`、`redmine_list_queries`、`redmine_list_users`、`redmine_get_current_user` | 始终启用 | 只读。 |
+| 附件 | `redmine_get_attachment`、`redmine_download_attachment`、`redmine_upload_attachment` | 使用 `REDMINE_MCP_DISABLE_ATTACHMENTS=true` 禁用。 | 上传工具在只读模式下隐藏；下载返回 base64 或 UTF-8 文本。 |
 | 问题关联 | `redmine_list_issue_relations`、`redmine_get_issue_relation`、`redmine_add_issue_relation`、`redmine_delete_issue_relation` | 使用 `REDMINE_MCP_DISABLE_RELATIONS=true` 禁用。 | 写工具在只读模式下隐藏。 |
 | 检查清单 | `redmine_list_checklists`、`redmine_add_checklist_item`、`redmine_update_checklist_item`、`redmine_delete_checklist_item` | 使用 `REDMINE_MCP_DISABLE_CHECKLISTS=true` 禁用。 | 需要 Redmine Checklists。 |
 | 工时 | `redmine_list_time_entries`、`redmine_get_time_entry`、`redmine_add_time_entry`、`redmine_update_time_entry`、`redmine_delete_time_entry`、`redmine_list_time_entry_activities` | 使用 `REDMINE_MCP_DISABLE_TIME_ENTRIES=true` 禁用。 | 写工具在只读模式下隐藏。 |

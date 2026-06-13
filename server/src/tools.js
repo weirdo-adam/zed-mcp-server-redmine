@@ -22,6 +22,7 @@ const silentWriteProperties = {
 const WRITE_TOOLS = new Set([
   "redmine_create_issue",
   "redmine_update_issue",
+  "redmine_upload_attachment",
   "redmine_add_issue_relation",
   "redmine_delete_issue_relation",
   "redmine_add_checklist_item",
@@ -38,6 +39,11 @@ const WRITE_TOOLS = new Set([
 ]);
 
 const FEATURE_TOOLS = {
+  attachments: new Set([
+    "redmine_get_attachment",
+    "redmine_download_attachment",
+    "redmine_upload_attachment",
+  ]),
   checklists: new Set([
     "redmine_list_checklists",
     "redmine_add_checklist_item",
@@ -73,6 +79,7 @@ const FEATURE_TOOLS = {
 };
 
 const FEATURE_ENV = {
+  attachments: "REDMINE_MCP_DISABLE_ATTACHMENTS",
   checklists: "REDMINE_MCP_DISABLE_CHECKLISTS",
   relations: "REDMINE_MCP_DISABLE_RELATIONS",
   timeEntries: "REDMINE_MCP_DISABLE_TIME_ENTRIES",
@@ -81,6 +88,7 @@ const FEATURE_ENV = {
 };
 
 const DEFAULT_ISSUE_INCLUDES = ["journals", "watchers", "checklists", "relations"];
+const DEFAULT_ATTACHMENT_MAX_BYTES = 10485760;
 const PROJECT_INCLUDES = [
   "trackers",
   "issue_categories",
@@ -222,6 +230,79 @@ export const TOOLS = [
         limit: readLimit,
       },
       ["q"]
+    ),
+  },
+  {
+    name: "redmine_get_attachment",
+    description: "Get Redmine attachment metadata.",
+    inputSchema: objectSchema(
+      {
+        attachment_id: integer("Attachment ID."),
+      },
+      ["attachment_id"]
+    ),
+  },
+  {
+    name: "redmine_download_attachment",
+    description:
+      "Download a Redmine attachment and return the content as base64 or UTF-8 text. The response is limited by REDMINE_MCP_ATTACHMENT_MAX_BYTES.",
+    inputSchema: objectSchema(
+      {
+        attachment_id: integer("Attachment ID."),
+        filename: {
+          type: "string",
+          description: "Optional filename override for the Redmine download URL.",
+        },
+        encoding: {
+          type: "string",
+          enum: ["base64", "utf8"],
+          default: "base64",
+        },
+        max_bytes: {
+          type: "integer",
+          minimum: 1,
+          description: "Per-call maximum download size in bytes.",
+        },
+      },
+      ["attachment_id"]
+    ),
+  },
+  {
+    name: "redmine_upload_attachment",
+    description:
+      "Upload attachment content to Redmine. Optionally attach the uploaded file to an issue using the returned upload token.",
+    inputSchema: objectSchema(
+      {
+        filename: {
+          type: "string",
+          minLength: 1,
+          description: "File name to send to Redmine. Must not include a path.",
+        },
+        content_base64: {
+          type: "string",
+          description: "Base64 encoded file content. Mutually exclusive with content.",
+        },
+        content: {
+          type: "string",
+          description: "UTF-8 text content. Mutually exclusive with content_base64.",
+        },
+        content_type: {
+          type: "string",
+          description: "Attachment content type recorded on the issue upload entry.",
+        },
+        description: {
+          type: "string",
+          description: "Attachment description recorded on the issue upload entry.",
+        },
+        issue_id: integer("Optional issue ID to attach the uploaded file to."),
+        max_bytes: {
+          type: "integer",
+          minimum: 1,
+          description: "Per-call maximum upload size in bytes.",
+        },
+        ...silentWriteProperties,
+      },
+      ["filename"]
     ),
   },
   {
@@ -666,6 +747,121 @@ const handlers = {
     return unwrap(await client.request("GET", "/search.json", { query: filterArgs(args) }));
   },
 
+  async redmine_get_attachment(client, args) {
+    const attachmentId = required(args, "attachment_id");
+    return unwrap(
+      await client.request("GET", `/attachments/${encodeURIComponent(attachmentId)}.json`)
+    );
+  },
+
+  async redmine_download_attachment(client, args) {
+    const attachmentId = required(args, "attachment_id");
+    const metadata = await handlers.redmine_get_attachment(client, args);
+    const attachment = metadata && metadata.attachment ? metadata.attachment : {};
+    const filename = args.filename || attachment.filename;
+    if (!filename) {
+      throw new InputError("filename is required when attachment metadata does not include one");
+    }
+
+    const maxBytes = attachmentMaxBytes(client, args);
+    const declaredSize = Number(attachment.filesize);
+    if (Number.isFinite(declaredSize) && declaredSize > maxBytes) {
+      throw new InputError(
+        `Attachment ${attachmentId} is ${declaredSize} bytes, exceeding max_bytes ${maxBytes}`
+      );
+    }
+
+    const response = await client.request(
+      "GET",
+      `/attachments/download/${encodeURIComponent(attachmentId)}/${encodeURIComponent(filename)}`,
+      {
+        accept: "*/*",
+        responseType: "buffer",
+      }
+    );
+    const bytes = response.body;
+    if (bytes.length > maxBytes) {
+      throw new InputError(
+        `Downloaded attachment ${attachmentId} is ${bytes.length} bytes, exceeding max_bytes ${maxBytes}`
+      );
+    }
+
+    const encoding = args.encoding || "base64";
+    const result = {
+      attachment_id: attachmentId,
+      filename,
+      content_type:
+        response.headers.get("content-type") || attachment.content_type || "application/octet-stream",
+      size: bytes.length,
+      encoding,
+    };
+    if (encoding === "utf8") {
+      result.content = bytes.toString("utf8");
+    } else {
+      result.content_base64 = bytes.toString("base64");
+    }
+    return result;
+  },
+
+  async redmine_upload_attachment(client, args) {
+    const filename = attachmentFilename(args);
+    const bytes = attachmentUploadBytes(args);
+    const maxBytes = attachmentMaxBytes(client, args);
+    if (bytes.length > maxBytes) {
+      throw new InputError(
+        `Attachment upload is ${bytes.length} bytes, exceeding max_bytes ${maxBytes}`
+      );
+    }
+
+    const uploadResponse = await client.request("POST", "/uploads.json", {
+      query: { filename },
+      rawBody: bytes,
+      contentType: "application/octet-stream",
+    });
+    const token = uploadResponse.body && uploadResponse.body.upload && uploadResponse.body.upload.token;
+    if (!token) {
+      throw new Error("Redmine upload response did not include upload.token");
+    }
+
+    const upload = {
+      token,
+      filename,
+      ...pickDefined(args, ["description", "content_type"]),
+    };
+    const issueId = args.issue_id;
+    if (issueId !== undefined && issueId !== null && issueId !== "") {
+      const attachResponse = await client.request(
+        "PUT",
+        `/issues/${encodeURIComponent(issueId)}.json`,
+        {
+          query: writeQuery(client, args),
+          body: {
+            issue: {
+              uploads: [upload],
+            },
+          },
+        }
+      );
+      return attachmentWriteResult(
+        client,
+        args,
+        "upload_attachment",
+        { issue_id: issueId, filename, token },
+        attachResponse,
+        upload
+      );
+    }
+
+    return attachmentWriteResult(
+      client,
+      args,
+      "upload_attachment",
+      { filename, token },
+      uploadResponse,
+      upload
+    );
+  },
+
   async redmine_list_issue_relations(client, args) {
     const issueId = required(args, "issue_id");
     return unwrap(
@@ -1021,6 +1217,58 @@ export function toolErrorPayload(error) {
   };
 }
 
+function attachmentWriteResult(client, args, operation, target, response, upload) {
+  if (isSilentWrite(client, args)) {
+    return {
+      ok: true,
+      operation,
+      target,
+      status: response.status,
+      upload,
+    };
+  }
+  return {
+    ok: true,
+    operation,
+    target,
+    status: response.status,
+    upload,
+    response: response.body,
+  };
+}
+
+function attachmentMaxBytes(client, args) {
+  const configured = Number(client.config && client.config.attachmentMaxBytes);
+  const requested = Number(args.max_bytes);
+  const maxBytes = Number.isFinite(requested) && requested > 0 ? requested : configured;
+  return Number.isFinite(maxBytes) && maxBytes > 0 ? maxBytes : DEFAULT_ATTACHMENT_MAX_BYTES;
+}
+
+function attachmentFilename(args) {
+  const filename = String(required(args, "filename"));
+  if (filename.includes("/") || filename.includes("\\") || filename === "." || filename === "..") {
+    throw new InputError("filename must be a file name, not a path");
+  }
+  return filename;
+}
+
+function attachmentUploadBytes(args) {
+  const hasBase64 = args.content_base64 !== undefined && args.content_base64 !== null;
+  const hasText = args.content !== undefined && args.content !== null;
+  if (hasBase64 === hasText) {
+    throw new InputError("Exactly one of content_base64 or content is required");
+  }
+  if (hasText) {
+    return Buffer.from(String(args.content), "utf8");
+  }
+
+  const normalized = String(args.content_base64).replace(/\s/g, "");
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(normalized) || normalized.length % 4 !== 0) {
+    throw new InputError("content_base64 must be valid base64");
+  }
+  return Buffer.from(normalized, "base64");
+}
+
 async function updateChecklist(client, args, issueId, checklist) {
   return client.request("PUT", `/issues/${encodeURIComponent(issueId)}.json`, {
     query: writeQuery(client, args),
@@ -1094,6 +1342,9 @@ function issueIncludes(client, requestedIncludes) {
     if (include === "watchers") {
       return !disabled.watchers;
     }
+    if (include === "attachments") {
+      return !disabled.attachments;
+    }
     return true;
   });
   return filtered.length ? filtered : undefined;
@@ -1111,6 +1362,7 @@ function disabledFeatureForTool(config = {}, toolName) {
 
 function disabledFeatures(config = {}) {
   return {
+    attachments: false,
     checklists: false,
     relations: false,
     timeEntries: false,

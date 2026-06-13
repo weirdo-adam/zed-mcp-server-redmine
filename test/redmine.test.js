@@ -18,6 +18,9 @@ test("tool list includes core and optional Redmine tools", () => {
   const names = new Set(listTools().map((tool) => tool.name));
   assert.ok(names.has("redmine_create_issue"));
   assert.ok(names.has("redmine_search"));
+  assert.ok(names.has("redmine_get_attachment"));
+  assert.ok(names.has("redmine_download_attachment"));
+  assert.ok(names.has("redmine_upload_attachment"));
   assert.ok(names.has("redmine_get_project"));
   assert.ok(names.has("redmine_list_trackers"));
   assert.ok(names.has("redmine_list_issue_priorities"));
@@ -38,11 +41,13 @@ test("config reads REDMINE_* values from the environment", () => {
     REDMINE_BASE_URL: "https://redmine.example.com/",
     REDMINE_API_KEY: "secret",
     REDMINE_MCP_READ_ONLY: "true",
+    REDMINE_MCP_DISABLE_ATTACHMENTS: "true",
     REDMINE_MCP_DISABLE_CHECKLISTS: "true",
     REDMINE_MCP_DISABLE_RELATIONS: "1",
     REDMINE_MCP_DISABLE_TIME_ENTRIES: "yes",
     REDMINE_MCP_DISABLE_VERSIONS: "on",
     REDMINE_MCP_DISABLE_WATCHERS: "true",
+    REDMINE_MCP_ATTACHMENT_MAX_BYTES: "2048",
     REDMINE_SILENT_WRITES: "yes",
     REDMINE_TIMEOUT_MS: "15000",
   });
@@ -51,12 +56,14 @@ test("config reads REDMINE_* values from the environment", () => {
   assert.equal(config.apiKey, "secret");
   assert.equal(config.readOnly, true);
   assert.deepEqual(config.disabledFeatures, {
+    attachments: true,
     checklists: true,
     relations: true,
     timeEntries: true,
     versions: true,
     watchers: true,
   });
+  assert.equal(config.attachmentMaxBytes, 2048);
   assert.equal(config.silentWrites, true);
   assert.equal(config.timeoutMs, 15000);
 });
@@ -75,6 +82,8 @@ test("read-only mode hides write tools and keeps read tools visible", () => {
   const names = new Set(listTools({ readOnly: true }).map((tool) => tool.name));
   assert.ok(names.has("redmine_get_issue"));
   assert.ok(names.has("redmine_search"));
+  assert.ok(names.has("redmine_get_attachment"));
+  assert.ok(names.has("redmine_download_attachment"));
   assert.ok(names.has("redmine_list_checklists"));
   assert.ok(names.has("redmine_list_time_entries"));
   assert.ok(names.has("redmine_get_time_entry"));
@@ -82,6 +91,7 @@ test("read-only mode hides write tools and keeps read tools visible", () => {
   assert.ok(names.has("redmine_list_watchers"));
   assert.equal(names.has("redmine_create_issue"), false);
   assert.equal(names.has("redmine_update_issue"), false);
+  assert.equal(names.has("redmine_upload_attachment"), false);
   assert.equal(names.has("redmine_add_time_entry"), false);
   assert.equal(names.has("redmine_create_version"), false);
   assert.equal(names.has("redmine_add_watcher"), false);
@@ -104,11 +114,27 @@ test("read-only mode rejects direct write tool calls before Redmine requests", a
   assert.equal(requests.length, 0);
 });
 
+test("read-only mode rejects attachment uploads before Redmine requests", async () => {
+  const requests = [];
+  const client = createClient(requests, { readOnly: true });
+
+  await assert.rejects(
+    () =>
+      callTool(client, "redmine_upload_attachment", {
+        filename: "report.txt",
+        content: "blocked",
+      }),
+    /REDMINE_MCP_READ_ONLY is enabled/
+  );
+  assert.equal(requests.length, 0);
+});
+
 test("feature disable flags hide grouped tools", () => {
   const names = new Set(
     listTools({
       disabledFeatures: {
         checklists: true,
+        attachments: true,
         relations: true,
         timeEntries: true,
         versions: true,
@@ -118,6 +144,9 @@ test("feature disable flags hide grouped tools", () => {
   );
 
   assert.ok(names.has("redmine_get_issue"));
+  assert.equal(names.has("redmine_get_attachment"), false);
+  assert.equal(names.has("redmine_download_attachment"), false);
+  assert.equal(names.has("redmine_upload_attachment"), false);
   assert.equal(names.has("redmine_list_checklists"), false);
   assert.equal(names.has("redmine_list_issue_relations"), false);
   assert.equal(names.has("redmine_list_time_entries"), false);
@@ -164,6 +193,22 @@ test("disabled issue features are removed from default get issue includes", asyn
   assert.equal(requests[0].url, "https://redmine.example.com/issues/42.json?include=journals");
 });
 
+test("disabled attachments are removed from get issue includes", async () => {
+  const requests = [];
+  const client = createClient(requests, {
+    disabledFeatures: {
+      attachments: true,
+    },
+  });
+
+  await callTool(client, "redmine_get_issue", {
+    issue_id: 42,
+    include: ["attachments", "journals"],
+  });
+
+  assert.equal(requests[0].url, "https://redmine.example.com/issues/42.json?include=journals");
+});
+
 test("search targets the native Redmine search endpoint", async () => {
   const requests = [];
   const client = createClient(requests);
@@ -181,6 +226,180 @@ test("search targets the native Redmine search endpoint", async () => {
   assert.equal(url.searchParams.get("issues"), "true");
   assert.equal(url.searchParams.get("open_issues"), "true");
   assert.equal(url.searchParams.get("limit"), "10");
+});
+
+test("attachment metadata targets the native Redmine attachment endpoint", async () => {
+  const requests = [];
+  const client = createClient(requests);
+
+  await callTool(client, "redmine_get_attachment", {
+    attachment_id: 12,
+  });
+
+  assert.equal(requests[0].url, "https://redmine.example.com/attachments/12.json");
+});
+
+test("attachment download returns base64 content with size checks", async () => {
+  const requests = [];
+  const client = createClient(requests, {
+    fetchImpl: async (url, request) => {
+      requests.push({ url, request });
+      if (url.endsWith("/attachments/12.json")) {
+        return jsonResponse({
+          attachment: {
+            id: 12,
+            filename: "report.txt",
+            filesize: 5,
+            content_type: "text/plain",
+          },
+        });
+      }
+      return new Response("hello", {
+        status: 200,
+        headers: { "content-type": "text/plain" },
+      });
+    },
+  });
+
+  const result = await callTool(client, "redmine_download_attachment", {
+    attachment_id: 12,
+  });
+
+  assert.equal(requests[0].url, "https://redmine.example.com/attachments/12.json");
+  assert.equal(requests[1].url, "https://redmine.example.com/attachments/download/12/report.txt");
+  assert.equal(requests[1].request.headers.Accept, "*/*");
+  assert.deepEqual(result, {
+    attachment_id: 12,
+    filename: "report.txt",
+    content_type: "text/plain",
+    size: 5,
+    encoding: "base64",
+    content_base64: "aGVsbG8=",
+  });
+});
+
+test("attachment download enforces max_bytes before download when metadata has filesize", async () => {
+  const requests = [];
+  const client = createClient(requests, {
+    attachmentMaxBytes: 4,
+    fetchImpl: async (url, request) => {
+      requests.push({ url, request });
+      return jsonResponse({
+        attachment: {
+          id: 12,
+          filename: "report.txt",
+          filesize: 5,
+        },
+      });
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      callTool(client, "redmine_download_attachment", {
+        attachment_id: 12,
+      }),
+    /exceeding max_bytes 4/
+  );
+  assert.equal(requests.length, 1);
+});
+
+test("attachment upload posts octet-stream content and returns upload token", async () => {
+  const requests = [];
+  const client = createClient(requests, {
+    fetchImpl: async (url, request) => {
+      requests.push({ url, request });
+      return jsonResponse(
+        {
+          upload: {
+            token: "upload-token",
+          },
+        },
+        201
+      );
+    },
+  });
+
+  const result = await callTool(client, "redmine_upload_attachment", {
+    filename: "report.txt",
+    content_base64: "aGVsbG8=",
+  });
+
+  assert.equal(requests[0].url, "https://redmine.example.com/uploads.json?filename=report.txt");
+  assert.equal(requests[0].request.method, "POST");
+  assert.equal(requests[0].request.headers["Content-Type"], "application/octet-stream");
+  assert.equal(Buffer.from(requests[0].request.body).toString("utf8"), "hello");
+  assert.deepEqual(result, {
+    ok: true,
+    operation: "upload_attachment",
+    target: {
+      filename: "report.txt",
+      token: "upload-token",
+    },
+    status: 201,
+    upload: {
+      token: "upload-token",
+      filename: "report.txt",
+    },
+    response: {
+      upload: {
+        token: "upload-token",
+      },
+    },
+  });
+});
+
+test("attachment upload can attach the uploaded file to an issue", async () => {
+  const requests = [];
+  const client = createClient(requests, {
+    fetchImpl: async (url, request) => {
+      requests.push({ url, request });
+      if (url.includes("/uploads.json")) {
+        return jsonResponse({ upload: { token: "upload-token" } }, 201);
+      }
+      return jsonResponse(null, 204);
+    },
+  });
+
+  const result = await callTool(client, "redmine_upload_attachment", {
+    issue_id: 42,
+    filename: "report.txt",
+    content: "hello",
+    content_type: "text/plain",
+    description: "Build report",
+    silent: true,
+  });
+
+  assert.equal(requests[1].url, "https://redmine.example.com/issues/42.json?notify=false");
+  assert.equal(requests[1].request.method, "PUT");
+  assert.deepEqual(JSON.parse(requests[1].request.body), {
+    issue: {
+      uploads: [
+        {
+          token: "upload-token",
+          filename: "report.txt",
+          description: "Build report",
+          content_type: "text/plain",
+        },
+      ],
+    },
+  });
+  assert.deepEqual(result, {
+    ok: true,
+    operation: "upload_attachment",
+    target: {
+      issue_id: 42,
+      filename: "report.txt",
+      token: "upload-token",
+    },
+    status: 204,
+    upload: {
+      token: "upload-token",
+      filename: "report.txt",
+      description: "Build report",
+      content_type: "text/plain",
+    },
+  });
 });
 
 test("metadata tools target native Redmine REST endpoints", async () => {
@@ -446,6 +665,7 @@ function createClient(requests, overrides = {}) {
     apiKey: "secret",
     readOnly: false,
     disabledFeatures: {
+      attachments: false,
       checklists: false,
       relations: false,
       timeEntries: false,
@@ -462,6 +682,13 @@ function createClient(requests, overrides = {}) {
       });
     },
     ...overrides,
+  });
+}
+
+function jsonResponse(payload, status = 200) {
+  return new Response(status === 204 ? null : JSON.stringify(payload), {
+    status,
+    headers: { "content-type": "application/json" },
   });
 }
 

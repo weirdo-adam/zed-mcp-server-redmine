@@ -93,6 +93,15 @@ fn env_from_settings(settings: &zed::serde_json::Value) -> Vec<(String, String)>
         ("redmine_mcp_read_only", "REDMINE_MCP_READ_ONLY"),
         ("read_only", "REDMINE_MCP_READ_ONLY"),
         (
+            "REDMINE_MCP_DISABLE_ATTACHMENTS",
+            "REDMINE_MCP_DISABLE_ATTACHMENTS",
+        ),
+        (
+            "redmine_mcp_disable_attachments",
+            "REDMINE_MCP_DISABLE_ATTACHMENTS",
+        ),
+        ("disable_attachments", "REDMINE_MCP_DISABLE_ATTACHMENTS"),
+        (
             "REDMINE_MCP_DISABLE_CHECKLISTS",
             "REDMINE_MCP_DISABLE_CHECKLISTS",
         ),
@@ -141,6 +150,15 @@ fn env_from_settings(settings: &zed::serde_json::Value) -> Vec<(String, String)>
         ("redmine_silent_writes", "REDMINE_SILENT_WRITES"),
         ("silent_writes", "REDMINE_SILENT_WRITES"),
         ("write_silent", "REDMINE_SILENT_WRITES"),
+        (
+            "REDMINE_MCP_ATTACHMENT_MAX_BYTES",
+            "REDMINE_MCP_ATTACHMENT_MAX_BYTES",
+        ),
+        (
+            "redmine_mcp_attachment_max_bytes",
+            "REDMINE_MCP_ATTACHMENT_MAX_BYTES",
+        ),
+        ("attachment_max_bytes", "REDMINE_MCP_ATTACHMENT_MAX_BYTES"),
         ("REDMINE_TIMEOUT_MS", "REDMINE_TIMEOUT_MS"),
         ("redmine_timeout_ms", "REDMINE_TIMEOUT_MS"),
         ("timeout_ms", "REDMINE_TIMEOUT_MS"),
@@ -192,6 +210,11 @@ const SETTINGS_SCHEMA: &str = r#"{
       "default": false,
       "description": "When true, write tools are hidden from tools/list and rejected if called directly."
     },
+    "REDMINE_MCP_DISABLE_ATTACHMENTS": {
+      "type": "boolean",
+      "default": false,
+      "description": "Disable attachment metadata, upload, and download tools."
+    },
     "REDMINE_MCP_DISABLE_CHECKLISTS": {
       "type": "boolean",
       "default": false,
@@ -222,6 +245,12 @@ const SETTINGS_SCHEMA: &str = r#"{
       "default": false,
       "description": "When true, write tools return compact success output and pass notify=false to Redmine write requests."
     },
+    "REDMINE_MCP_ATTACHMENT_MAX_BYTES": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 10485760,
+      "description": "Maximum attachment upload/download payload size returned through MCP."
+    },
     "REDMINE_TIMEOUT_MS": {
       "type": "integer",
       "minimum": 1000,
@@ -243,11 +272,13 @@ mod tests {
             "REDMINE_BASE_URL": "https://redmine.example.com/",
             "REDMINE_API_KEY": "secret",
             "REDMINE_MCP_READ_ONLY": true,
+            "REDMINE_MCP_DISABLE_ATTACHMENTS": true,
             "REDMINE_MCP_DISABLE_CHECKLISTS": true,
             "REDMINE_MCP_DISABLE_RELATIONS": true,
             "REDMINE_MCP_DISABLE_TIME_ENTRIES": true,
             "REDMINE_MCP_DISABLE_VERSIONS": true,
             "REDMINE_MCP_DISABLE_WATCHERS": true,
+            "REDMINE_MCP_ATTACHMENT_MAX_BYTES": 2048,
             "REDMINE_SILENT_WRITES": true,
             "REDMINE_TIMEOUT_MS": 15000
         }));
@@ -255,11 +286,13 @@ mod tests {
         assert_env(&env, "REDMINE_BASE_URL", "https://redmine.example.com/");
         assert_env(&env, "REDMINE_API_KEY", "secret");
         assert_env(&env, "REDMINE_MCP_READ_ONLY", "true");
+        assert_env(&env, "REDMINE_MCP_DISABLE_ATTACHMENTS", "true");
         assert_env(&env, "REDMINE_MCP_DISABLE_CHECKLISTS", "true");
         assert_env(&env, "REDMINE_MCP_DISABLE_RELATIONS", "true");
         assert_env(&env, "REDMINE_MCP_DISABLE_TIME_ENTRIES", "true");
         assert_env(&env, "REDMINE_MCP_DISABLE_VERSIONS", "true");
         assert_env(&env, "REDMINE_MCP_DISABLE_WATCHERS", "true");
+        assert_env(&env, "REDMINE_MCP_ATTACHMENT_MAX_BYTES", "2048");
         assert_env(&env, "REDMINE_SILENT_WRITES", "true");
         assert_env(&env, "REDMINE_TIMEOUT_MS", "15000");
     }

@@ -187,6 +187,7 @@ REDMINE_MCP_READ_ONLY = "true"
 - Arguments: `["/absolute/path/to/zed-mcp-server-redmine/server/index.js"]`
 - 必填环境变量：`REDMINE_BASE_URL`、`REDMINE_API_KEY`
 - 建议安全开关：`REDMINE_MCP_READ_ONLY=true`
+- 可选附件限制：`REDMINE_MCP_ATTACHMENT_MAX_BYTES=10485760`
 
 已暴露的 Redmine API 范围和 feature flags 见 [api-coverage.md](api-coverage.md)。
 

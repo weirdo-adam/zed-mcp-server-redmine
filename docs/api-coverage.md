@@ -31,7 +31,7 @@ Status definitions:
 | Time entries | Supported | `redmine_list_time_entries`, `redmine_get_time_entry`, `redmine_add_time_entry`, `redmine_update_time_entry`, `redmine_delete_time_entry`, `redmine_list_time_entry_activities` | Can be disabled with `REDMINE_MCP_DISABLE_TIME_ENTRIES=true`. |
 | Versions | Supported | `redmine_list_versions`, `redmine_get_version`, `redmine_create_version`, `redmine_update_version`, `redmine_delete_version` | Can be disabled with `REDMINE_MCP_DISABLE_VERSIONS=true`. |
 | Watchers | Supported | `redmine_list_watchers`, `redmine_add_watcher`, `redmine_remove_watcher` | Can be disabled with `REDMINE_MCP_DISABLE_WATCHERS=true`. |
-| Attachments | Planned | Not implemented | Upload/download handling is intentionally deferred. |
+| Attachments | Supported | `redmine_get_attachment`, `redmine_download_attachment`, `redmine_upload_attachment` | Upload is a write tool guarded by `REDMINE_MCP_READ_ONLY`. Download returns base64 or UTF-8 content and is limited by `REDMINE_MCP_ATTACHMENT_MAX_BYTES`. |
 | Wiki pages | Planned | Not implemented | Read-only support is the recommended first step. |
 | News | Not supported | Not implemented | No current plan. |
 | Files | Not supported | Not implemented | No current plan. |
@@ -55,13 +55,14 @@ the operation before any Redmine request is made.
 
 1. Project memberships read-only tools.
 2. Wiki pages read-only tools behind a dedicated feature flag.
-3. Attachment upload/download after file transport and security behavior are
-   designed.
+3. Attachment delete support, only if documented as destructive and guarded by
+   `REDMINE_MCP_READ_ONLY`.
 4. `redmine_delete_issue`, only if documented as destructive and guarded by
    `REDMINE_MCP_READ_ONLY`.
 
 ## References
 
 - [Redmine REST API](https://www.redmine.org/projects/redmine/wiki/Rest_api)
+- [Redmine REST Attachments](https://www.redmine.org/projects/redmine/wiki/Rest_Attachments)
 - [Redmine REST Time Entries](https://www.redmine.org/projects/redmine/wiki/Rest_TimeEntries)
 - [Redmine REST Projects](https://www.redmine.org/projects/redmine/wiki/Rest_Projects)
