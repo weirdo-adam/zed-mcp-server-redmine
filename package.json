@@ -6,8 +6,10 @@
   "scripts": {
     "check": "npm run lint:js && npm test && cargo check && cargo clippy --all-targets --all-features -- -D warnings",
     "format:check": "cargo fmt --check",
+    "install:local": "scripts/install-local.sh",
     "lint": "npm run lint:js && cargo clippy --all-targets --all-features -- -D warnings",
     "lint:js": "node --check server/index.js && node --check server/src/redmine.js && node --check server/src/tools.js && node --check test/redmine.test.js",
+    "package:release": "scripts/package-release.sh",
     "start": "node server/index.js",
     "test": "node --test"
   },

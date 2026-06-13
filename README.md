@@ -3,7 +3,9 @@
 [简体中文](README.zh-CN.md)
 
 A Zed extension that registers a `redmine` MCP context server and runs the
-bundled stdio MCP server with Zed's Node.js runtime.
+bundled stdio MCP server with Zed's Node.js runtime. The bundled
+`server/index.js` entrypoint can also run as a local MCP server for agent
+development tools that support stdio MCP servers.
 
 ## Requirements
 
@@ -65,6 +67,22 @@ export REDMINE_MCP_READ_ONLY=true
 node server/index.js
 ```
 
+## Agent Client Configuration
+
+The server uses the standard stdio MCP transport. It can be configured in Zed,
+Claude Code or Claude Desktop, Codex, and other local MCP clients by launching
+`node /absolute/path/to/server/index.js` with the `REDMINE_*` environment
+variables.
+
+See [docs/client-configuration.md](docs/client-configuration.md) for client
+configuration examples.
+
+Local one-command install for non-Zed MCP clients:
+
+```sh
+scripts/install-local.sh
+```
+
 ## Security
 
 Effective permissions are determined by the configured Redmine API key. Use the
@@ -102,6 +120,19 @@ Rust clippy, and the Zed WASI target check.
 
 The MCP stdio transport uses newline-delimited JSON-RPC on stdout. Logs and
 diagnostics must be written to stderr.
+
+## Local Releases
+
+Local release archives are maintained manually. To build the Zed extension wasm
+and create a distributable archive under `dist/`:
+
+```sh
+scripts/package-release.sh
+```
+
+The archive includes the Zed extension files, the standalone MCP server, docs,
+and the local install script. Publish the generated archive and `.sha256` file
+as release assets when maintaining releases outside the Zed extension registry.
 
 ## Support
 

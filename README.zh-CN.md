@@ -3,7 +3,8 @@
 [English](README.md)
 
 一个 Zed 扩展，用于注册 `redmine` MCP context server，并通过 Zed 内置
-Node.js 运行时启动随附的 stdio MCP server。
+Node.js 运行时启动随附的 stdio MCP server。随附的 `server/index.js` 入口
+也可以作为本地 MCP server，用于支持 stdio MCP 的 agent 开发工具。
 
 ## 运行要求
 
@@ -63,6 +64,21 @@ export REDMINE_MCP_READ_ONLY=true
 node server/index.js
 ```
 
+## Agent 客户端配置
+
+本服务使用标准 stdio MCP transport。Zed、Claude Code 或 Claude Desktop、
+Codex，以及其他本地 MCP 客户端都可以通过启动
+`node /absolute/path/to/server/index.js` 并传入 `REDMINE_*` 环境变量来使用。
+
+客户端配置示例见
+[docs/client-configuration.zh-CN.md](docs/client-configuration.zh-CN.md)。
+
+非 Zed MCP 客户端的一键本地安装：
+
+```sh
+scripts/install-local.sh
+```
+
 ## 安全
 
 实际权限由配置的 Redmine API key 决定。建议为目标项目使用最小必要权限；不需要
@@ -98,6 +114,18 @@ scripts/check.sh
 
 MCP stdio transport 使用 stdout 输出按行分隔的 JSON-RPC 消息。日志和诊断信息
 必须写入 stderr。
+
+## 本地 Release
+
+本地 release 包手动维护。构建 Zed extension wasm 并在 `dist/` 下生成发布包：
+
+```sh
+scripts/package-release.sh
+```
+
+发布包包含 Zed 扩展文件、独立 MCP server、文档和本地安装脚本。若不通过 Zed
+扩展市场维护 release，可将生成的 archive 和 `.sha256` 文件作为 release assets
+发布。
 
 ## 支持
 
