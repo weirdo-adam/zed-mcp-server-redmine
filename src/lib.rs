@@ -169,11 +169,9 @@ Core issue, search, and metadata tools are always active. Optional tool groups a
 Use `REDMINE_MCP_READ_ONLY=true` when the agent should inspect Redmine without making changes."#;
 
 const DEFAULT_SETTINGS: &str = r#"{
-  "settings": {
-    "REDMINE_BASE_URL": "https://redmine.example.com",
-    "REDMINE_API_KEY": "",
-    "REDMINE_MCP_READ_ONLY": false
-  }
+  "REDMINE_BASE_URL": "https://redmine.example.com",
+  "REDMINE_API_KEY": "",
+  "REDMINE_MCP_READ_ONLY": false
 }"#;
 
 const SETTINGS_SCHEMA: &str = r#"{
@@ -274,6 +272,19 @@ mod tests {
 
         assert!(!env.iter().any(|(key, _)| key == "REDMINE_READ_ONLY"));
         assert!(!env.iter().any(|(key, _)| key == "REDMINE_MCP_READ_ONLY"));
+    }
+
+    #[test]
+    fn default_settings_match_settings_schema_shape() {
+        let parsed: Result<zed_extension_api::serde_json::Value, _> =
+            zed_extension_api::serde_json::from_str(super::DEFAULT_SETTINGS);
+        assert!(parsed.is_ok());
+        let settings = parsed.unwrap_or_else(|_| json!({}));
+
+        assert!(settings.get("settings").is_none());
+        assert!(settings.get("REDMINE_BASE_URL").is_some());
+        assert!(settings.get("REDMINE_API_KEY").is_some());
+        assert!(settings.get("REDMINE_MCP_READ_ONLY").is_some());
     }
 
     fn assert_env(env: &[(String, String)], key: &str, expected: &str) {
