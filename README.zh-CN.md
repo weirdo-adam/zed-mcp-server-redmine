@@ -17,6 +17,7 @@
       "settings": {
         "REDMINE_BASE_URL": "https://redmine.example.com",
         "REDMINE_API_KEY": "your-api-key",
+        "REDMINE_READ_ONLY": false,
         "REDMINE_SILENT_WRITES": false,
         "REDMINE_TIMEOUT_MS": 30000
       }
@@ -25,13 +26,33 @@
 }
 ```
 
-服务端也会读取同名进程环境变量。扩展层支持 `base_url`、`api_key`、
-`silent_writes` 等小写别名，但最终会向服务端传递标准的 `REDMINE_*`
-环境变量。
+扩展会把 Zed settings 中的配置转换成标准 `REDMINE_*` 环境变量传给内置
+服务端。服务端本身也会直接读取同名进程环境变量，因此同一个 server 也可以
+在 Zed 之外独立运行。
 
-`REDMINE_SILENT_WRITES=true` 会让写操作工具返回更精简的成功结果，并在
-Redmine 写请求中附加 `notify=false`。每个写操作工具也支持通过 `silent`
-和 `notify` 参数进行单次调用级别的覆盖。
+Zed settings 中支持 `base_url`、`api_key`、`read_only`、`silent_writes`
+等小写别名，但服务端侧稳定约定是下面这些 `REDMINE_*` 变量。
+
+| 变量 | 必填 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `REDMINE_BASE_URL` | 是 | 无 | Redmine 实例地址，例如 `https://redmine.example.com`。 |
+| `REDMINE_API_KEY` | 是 | 无 | Redmine REST API key。 |
+| `REDMINE_READ_ONLY` | 否 | `false` | 开启只读模式。写工具会从 `tools/list` 中隐藏，即使被直接调用也会被拒绝。 |
+| `REDMINE_SILENT_WRITES` | 否 | `false` | 写工具返回更精简的成功结果，并在 Redmine 写请求中附加 `notify=false`。 |
+| `REDMINE_TIMEOUT_MS` | 否 | `30000` | HTTP 请求超时时间，单位毫秒。 |
+
+只通过环境变量运行的示例：
+
+```sh
+export REDMINE_BASE_URL="https://redmine.example.com"
+export REDMINE_API_KEY="your-api-key"
+export REDMINE_READ_ONLY=true
+node server/index.js
+```
+
+`REDMINE_READ_ONLY=true` 适合只允许 agent 查看 Redmine、禁止任何变更的场景。
+`REDMINE_SILENT_WRITES=true` 只改变写入通知和返回内容，不会阻止写操作。每个
+写操作工具也支持通过 `silent` 和 `notify` 参数进行单次调用级别的覆盖。
 
 ## 工具能力
 

@@ -89,6 +89,9 @@ fn env_from_settings(settings: &zed::serde_json::Value) -> Vec<(String, String)>
         ("REDMINE_API_KEY", "REDMINE_API_KEY"),
         ("redmine_api_key", "REDMINE_API_KEY"),
         ("api_key", "REDMINE_API_KEY"),
+        ("REDMINE_READ_ONLY", "REDMINE_READ_ONLY"),
+        ("redmine_read_only", "REDMINE_READ_ONLY"),
+        ("read_only", "REDMINE_READ_ONLY"),
         ("REDMINE_SILENT_WRITES", "REDMINE_SILENT_WRITES"),
         ("redmine_silent_writes", "REDMINE_SILENT_WRITES"),
         ("silent_writes", "REDMINE_SILENT_WRITES"),
@@ -123,6 +126,7 @@ const INSTALLATION_INSTRUCTIONS: &str = r#"Configure the Redmine context server 
       "settings": {
         "REDMINE_BASE_URL": "https://redmine.example.com",
         "REDMINE_API_KEY": "your-api-key",
+        "REDMINE_READ_ONLY": false,
         "REDMINE_SILENT_WRITES": false
       }
     }
@@ -136,6 +140,7 @@ const DEFAULT_SETTINGS: &str = r#"{
   "settings": {
     "REDMINE_BASE_URL": "https://redmine.example.com",
     "REDMINE_API_KEY": "",
+    "REDMINE_READ_ONLY": false,
     "REDMINE_SILENT_WRITES": false,
     "REDMINE_TIMEOUT_MS": 30000
   }
@@ -153,6 +158,11 @@ const SETTINGS_SCHEMA: &str = r#"{
     "REDMINE_API_KEY": {
       "type": "string",
       "description": "Redmine REST API key."
+    },
+    "REDMINE_READ_ONLY": {
+      "type": "boolean",
+      "default": false,
+      "description": "When true, write tools are hidden from tools/list and rejected if called directly."
     },
     "REDMINE_SILENT_WRITES": {
       "type": "boolean",

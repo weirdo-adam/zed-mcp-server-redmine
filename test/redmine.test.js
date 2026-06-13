@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import test from "node:test";
 
-import { buildUrl, createRedmineClient } from "../server/src/redmine.js";
+import { buildUrl, createConfig, createRedmineClient } from "../server/src/redmine.js";
 import { callTool, listTools } from "../server/src/tools.js";
 
 test("buildUrl trims base URL and serializes array query values", () => {
@@ -20,6 +20,52 @@ test("tool list includes native checklist, time entry, version, and watcher tool
   assert.ok(names.has("redmine_add_time_entry"));
   assert.ok(names.has("redmine_list_versions"));
   assert.ok(names.has("redmine_add_watcher"));
+});
+
+test("config reads REDMINE_* values from the environment", () => {
+  const config = createConfig({
+    REDMINE_BASE_URL: "https://redmine.example.com/",
+    REDMINE_API_KEY: "secret",
+    REDMINE_READ_ONLY: "true",
+    REDMINE_SILENT_WRITES: "yes",
+    REDMINE_TIMEOUT_MS: "15000",
+  });
+
+  assert.equal(config.baseUrl, "https://redmine.example.com");
+  assert.equal(config.apiKey, "secret");
+  assert.equal(config.readOnly, true);
+  assert.equal(config.silentWrites, true);
+  assert.equal(config.timeoutMs, 15000);
+});
+
+test("read-only mode hides write tools and keeps read tools visible", () => {
+  const names = new Set(listTools({ readOnly: true }).map((tool) => tool.name));
+  assert.ok(names.has("redmine_get_issue"));
+  assert.ok(names.has("redmine_list_checklists"));
+  assert.ok(names.has("redmine_list_time_entries"));
+  assert.ok(names.has("redmine_list_versions"));
+  assert.ok(names.has("redmine_list_watchers"));
+  assert.equal(names.has("redmine_update_issue"), false);
+  assert.equal(names.has("redmine_add_time_entry"), false);
+  assert.equal(names.has("redmine_create_version"), false);
+  assert.equal(names.has("redmine_add_watcher"), false);
+});
+
+test("read-only mode rejects direct write tool calls before Redmine requests", async () => {
+  const requests = [];
+  const client = createClient(requests, { readOnly: true });
+
+  await assert.rejects(
+    () =>
+      callTool(client, "redmine_update_issue", {
+        issue_id: 42,
+        fields: {
+          notes: "blocked",
+        },
+      }),
+    /REDMINE_READ_ONLY is enabled/
+  );
+  assert.equal(requests.length, 0);
 });
 
 test("write silent mode returns compact output and passes notify=false", async () => {
@@ -159,6 +205,7 @@ function createClient(requests, overrides = {}) {
   return createRedmineClient({
     baseUrl: "https://redmine.example.com/",
     apiKey: "secret",
+    readOnly: false,
     timeoutMs: 30000,
     silentWrites: false,
     fetchImpl: async (url, request) => {

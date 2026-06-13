@@ -19,6 +19,21 @@ const silentWriteProperties = {
   },
 };
 
+const WRITE_TOOLS = new Set([
+  "redmine_update_issue",
+  "redmine_add_checklist_item",
+  "redmine_update_checklist_item",
+  "redmine_delete_checklist_item",
+  "redmine_add_time_entry",
+  "redmine_update_time_entry",
+  "redmine_delete_time_entry",
+  "redmine_create_version",
+  "redmine_update_version",
+  "redmine_delete_version",
+  "redmine_add_watcher",
+  "redmine_remove_watcher",
+]);
+
 export class InputError extends Error {
   constructor(message) {
     super(message);
@@ -567,7 +582,10 @@ const handlers = {
   },
 };
 
-export function listTools() {
+export function listTools(config = {}) {
+  if (config.readOnly) {
+    return TOOLS.filter((tool) => !WRITE_TOOLS.has(tool.name));
+  }
   return TOOLS;
 }
 
@@ -575,6 +593,9 @@ export async function callTool(client, name, args = {}) {
   const handler = handlers[name];
   if (!handler) {
     throw new InputError(`Unknown tool: ${name}`);
+  }
+  if (client.config && client.config.readOnly && WRITE_TOOLS.has(name)) {
+    throw new Error(`REDMINE_READ_ONLY is enabled; write tool ${name} is disabled`);
   }
   return handler(client, args || {});
 }

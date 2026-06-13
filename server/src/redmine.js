@@ -23,6 +23,7 @@ export function createConfig(env = process.env, fetchImpl = globalThis.fetch) {
   return {
     baseUrl: trimTrailingSlash(env.REDMINE_BASE_URL || ""),
     apiKey: env.REDMINE_API_KEY || "",
+    readOnly: parseBoolean(env.REDMINE_READ_ONLY, false),
     silentWrites: parseBoolean(env.REDMINE_SILENT_WRITES, false),
     timeoutMs: Number(env.REDMINE_TIMEOUT_MS || 30000),
     fetchImpl,

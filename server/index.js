@@ -59,7 +59,7 @@ async function handleMessage(message) {
 
     case "tools/list":
       return {
-        tools: listTools(),
+        tools: listTools(client.config),
       };
 
     case "tools/call":
