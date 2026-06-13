@@ -84,10 +84,10 @@ status and planned additions.
 | Group | Tools | Availability | Notes |
 | --- | --- | --- | --- |
 | Issues | `redmine_list_issues`, `redmine_get_issue`, `redmine_create_issue`, `redmine_update_issue` | Always enabled | Write tools are hidden in read-only mode. |
-| Search and metadata | `redmine_search`, `redmine_list_projects`, `redmine_list_issue_statuses`, `redmine_list_users` | Always enabled | Read-only. |
+| Search and metadata | `redmine_search`, `redmine_list_projects`, `redmine_get_project`, `redmine_list_issue_statuses`, `redmine_list_trackers`, `redmine_list_issue_priorities`, `redmine_list_issue_categories`, `redmine_list_custom_fields`, `redmine_list_queries`, `redmine_list_users`, `redmine_get_current_user` | Always enabled | Read-only. |
 | Issue relations | `redmine_list_issue_relations`, `redmine_get_issue_relation`, `redmine_add_issue_relation`, `redmine_delete_issue_relation` | Disable with `REDMINE_MCP_DISABLE_RELATIONS=true`. | Write tools are hidden in read-only mode. |
 | Checklists | `redmine_list_checklists`, `redmine_add_checklist_item`, `redmine_update_checklist_item`, `redmine_delete_checklist_item` | Disable with `REDMINE_MCP_DISABLE_CHECKLISTS=true`. | Requires Redmine Checklists. |
-| Time entries | `redmine_list_time_entries`, `redmine_add_time_entry`, `redmine_update_time_entry`, `redmine_delete_time_entry`, `redmine_list_time_entry_activities` | Disable with `REDMINE_MCP_DISABLE_TIME_ENTRIES=true`. | Write tools are hidden in read-only mode. |
+| Time entries | `redmine_list_time_entries`, `redmine_get_time_entry`, `redmine_add_time_entry`, `redmine_update_time_entry`, `redmine_delete_time_entry`, `redmine_list_time_entry_activities` | Disable with `REDMINE_MCP_DISABLE_TIME_ENTRIES=true`. | Write tools are hidden in read-only mode. |
 | Versions | `redmine_list_versions`, `redmine_get_version`, `redmine_create_version`, `redmine_update_version`, `redmine_delete_version` | Disable with `REDMINE_MCP_DISABLE_VERSIONS=true`. | Write tools are hidden in read-only mode. |
 | Watchers | `redmine_list_watchers`, `redmine_add_watcher`, `redmine_remove_watcher` | Disable with `REDMINE_MCP_DISABLE_WATCHERS=true`. | Write tools are hidden in read-only mode. |
 

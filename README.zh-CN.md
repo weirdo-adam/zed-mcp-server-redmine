@@ -80,10 +80,10 @@ Redmine REST API 覆盖状态和计划补充项见
 | 分组 | 工具 | 可用性 | 说明 |
 | --- | --- | --- | --- |
 | 问题 | `redmine_list_issues`、`redmine_get_issue`、`redmine_create_issue`、`redmine_update_issue` | 始终启用 | 写工具在只读模式下隐藏。 |
-| 搜索和元数据 | `redmine_search`、`redmine_list_projects`、`redmine_list_issue_statuses`、`redmine_list_users` | 始终启用 | 只读。 |
+| 搜索和元数据 | `redmine_search`、`redmine_list_projects`、`redmine_get_project`、`redmine_list_issue_statuses`、`redmine_list_trackers`、`redmine_list_issue_priorities`、`redmine_list_issue_categories`、`redmine_list_custom_fields`、`redmine_list_queries`、`redmine_list_users`、`redmine_get_current_user` | 始终启用 | 只读。 |
 | 问题关联 | `redmine_list_issue_relations`、`redmine_get_issue_relation`、`redmine_add_issue_relation`、`redmine_delete_issue_relation` | 使用 `REDMINE_MCP_DISABLE_RELATIONS=true` 禁用。 | 写工具在只读模式下隐藏。 |
 | 检查清单 | `redmine_list_checklists`、`redmine_add_checklist_item`、`redmine_update_checklist_item`、`redmine_delete_checklist_item` | 使用 `REDMINE_MCP_DISABLE_CHECKLISTS=true` 禁用。 | 需要 Redmine Checklists。 |
-| 工时 | `redmine_list_time_entries`、`redmine_add_time_entry`、`redmine_update_time_entry`、`redmine_delete_time_entry`、`redmine_list_time_entry_activities` | 使用 `REDMINE_MCP_DISABLE_TIME_ENTRIES=true` 禁用。 | 写工具在只读模式下隐藏。 |
+| 工时 | `redmine_list_time_entries`、`redmine_get_time_entry`、`redmine_add_time_entry`、`redmine_update_time_entry`、`redmine_delete_time_entry`、`redmine_list_time_entry_activities` | 使用 `REDMINE_MCP_DISABLE_TIME_ENTRIES=true` 禁用。 | 写工具在只读模式下隐藏。 |
 | 版本 | `redmine_list_versions`、`redmine_get_version`、`redmine_create_version`、`redmine_update_version`、`redmine_delete_version` | 使用 `REDMINE_MCP_DISABLE_VERSIONS=true` 禁用。 | 写工具在只读模式下隐藏。 |
 | 关注者 | `redmine_list_watchers`、`redmine_add_watcher`、`redmine_remove_watcher` | 使用 `REDMINE_MCP_DISABLE_WATCHERS=true` 禁用。 | 写工具在只读模式下隐藏。 |
 

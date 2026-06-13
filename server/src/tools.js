@@ -52,6 +52,7 @@ const FEATURE_TOOLS = {
   ]),
   timeEntries: new Set([
     "redmine_list_time_entries",
+    "redmine_get_time_entry",
     "redmine_add_time_entry",
     "redmine_update_time_entry",
     "redmine_delete_time_entry",
@@ -80,6 +81,13 @@ const FEATURE_ENV = {
 };
 
 const DEFAULT_ISSUE_INCLUDES = ["journals", "watchers", "checklists", "relations"];
+const PROJECT_INCLUDES = [
+  "trackers",
+  "issue_categories",
+  "enabled_modules",
+  "time_entry_activities",
+  "issue_custom_fields",
+];
 
 export class InputError extends Error {
   constructor(message) {
@@ -340,6 +348,16 @@ export const TOOLS = [
     }),
   },
   {
+    name: "redmine_get_time_entry",
+    description: "Get one Redmine time entry.",
+    inputSchema: objectSchema(
+      {
+        time_entry_id: integer("Time entry ID."),
+      },
+      ["time_entry_id"]
+    ),
+  },
+  {
     name: "redmine_add_time_entry",
     description: "Add a Redmine time entry to an issue or project.",
     inputSchema: objectSchema(
@@ -493,14 +511,74 @@ export const TOOLS = [
     name: "redmine_list_projects",
     description: "List Redmine projects.",
     inputSchema: objectSchema({
+      include: {
+        type: "array",
+        description: "Associated project data to include.",
+        items: {
+          type: "string",
+          enum: PROJECT_INCLUDES,
+        },
+      },
       offset: { type: "integer", minimum: 0 },
       limit: readLimit,
     }),
   },
   {
+    name: "redmine_get_project",
+    description: "Get one Redmine project by numeric ID or identifier.",
+    inputSchema: objectSchema(
+      {
+        project_id: stringOrInteger("Project identifier or numeric ID."),
+        include: {
+          type: "array",
+          description: "Associated project data to include.",
+          items: {
+            type: "string",
+            enum: PROJECT_INCLUDES,
+          },
+        },
+      },
+      ["project_id"]
+    ),
+  },
+  {
     name: "redmine_list_issue_statuses",
     description: "List Redmine issue statuses.",
     inputSchema: objectSchema({}),
+  },
+  {
+    name: "redmine_list_trackers",
+    description: "List Redmine trackers.",
+    inputSchema: objectSchema({}),
+  },
+  {
+    name: "redmine_list_issue_priorities",
+    description: "List Redmine issue priorities.",
+    inputSchema: objectSchema({}),
+  },
+  {
+    name: "redmine_list_issue_categories",
+    description: "List issue categories for one Redmine project.",
+    inputSchema: objectSchema(
+      {
+        project_id: stringOrInteger("Project identifier or numeric ID."),
+      },
+      ["project_id"]
+    ),
+  },
+  {
+    name: "redmine_list_custom_fields",
+    description: "List Redmine custom field definitions. Redmine requires admin privileges.",
+    inputSchema: objectSchema({}),
+  },
+  {
+    name: "redmine_list_queries",
+    description: "List saved Redmine issue queries visible to the API user.",
+    inputSchema: objectSchema({
+      project_id: stringOrInteger("Optional project identifier or numeric ID."),
+      offset: { type: "integer", minimum: 0 },
+      limit: readLimit,
+    }),
   },
   {
     name: "redmine_list_users",
@@ -511,6 +589,20 @@ export const TOOLS = [
       status: integer("User status."),
       offset: { type: "integer", minimum: 0 },
       limit: readLimit,
+    }),
+  },
+  {
+    name: "redmine_get_current_user",
+    description: "Get the Redmine user associated with the configured API key.",
+    inputSchema: objectSchema({
+      include: {
+        type: "array",
+        description: "Optional user associations to include.",
+        items: {
+          type: "string",
+          enum: ["memberships", "groups"],
+        },
+      },
     }),
   },
 ];
@@ -678,6 +770,13 @@ const handlers = {
     return unwrap(await client.request("GET", "/time_entries.json", { query: filterArgs(args) }));
   },
 
+  async redmine_get_time_entry(client, args) {
+    const timeEntryId = required(args, "time_entry_id");
+    return unwrap(
+      await client.request("GET", `/time_entries/${encodeURIComponent(timeEntryId)}.json`)
+    );
+  },
+
   async redmine_add_time_entry(client, args) {
     if (args.issue_id === undefined && args.project_id === undefined) {
       throw new InputError("Either issue_id or project_id is required");
@@ -826,12 +925,55 @@ const handlers = {
     return unwrap(await client.request("GET", "/projects.json", { query: filterArgs(args) }));
   },
 
+  async redmine_get_project(client, args) {
+    const projectId = required(args, "project_id");
+    return unwrap(
+      await client.request("GET", `/projects/${encodeURIComponent(projectId)}.json`, {
+        query: {
+          include: args.include,
+        },
+      })
+    );
+  },
+
   async redmine_list_issue_statuses(client) {
     return unwrap(await client.request("GET", "/issue_statuses.json"));
   },
 
+  async redmine_list_trackers(client) {
+    return unwrap(await client.request("GET", "/trackers.json"));
+  },
+
+  async redmine_list_issue_priorities(client) {
+    return unwrap(await client.request("GET", "/enumerations/issue_priorities.json"));
+  },
+
+  async redmine_list_issue_categories(client, args) {
+    const projectId = required(args, "project_id");
+    return unwrap(
+      await client.request(
+        "GET",
+        `/projects/${encodeURIComponent(projectId)}/issue_categories.json`
+      )
+    );
+  },
+
+  async redmine_list_custom_fields(client) {
+    return unwrap(await client.request("GET", "/custom_fields.json"));
+  },
+
+  async redmine_list_queries(client, args) {
+    return unwrap(await client.request("GET", "/queries.json", { query: filterArgs(args) }));
+  },
+
   async redmine_list_users(client, args) {
     return unwrap(await client.request("GET", "/users.json", { query: filterArgs(args) }));
+  },
+
+  async redmine_get_current_user(client, args) {
+    return unwrap(
+      await client.request("GET", "/users/current.json", { query: filterArgs(args) })
+    );
   },
 };
 

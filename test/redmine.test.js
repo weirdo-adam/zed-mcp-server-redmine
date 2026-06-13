@@ -18,9 +18,17 @@ test("tool list includes core and optional Redmine tools", () => {
   const names = new Set(listTools().map((tool) => tool.name));
   assert.ok(names.has("redmine_create_issue"));
   assert.ok(names.has("redmine_search"));
+  assert.ok(names.has("redmine_get_project"));
+  assert.ok(names.has("redmine_list_trackers"));
+  assert.ok(names.has("redmine_list_issue_priorities"));
+  assert.ok(names.has("redmine_list_issue_categories"));
+  assert.ok(names.has("redmine_list_custom_fields"));
+  assert.ok(names.has("redmine_list_queries"));
+  assert.ok(names.has("redmine_get_current_user"));
   assert.ok(names.has("redmine_list_checklists"));
   assert.ok(names.has("redmine_list_issue_relations"));
   assert.ok(names.has("redmine_add_time_entry"));
+  assert.ok(names.has("redmine_get_time_entry"));
   assert.ok(names.has("redmine_list_versions"));
   assert.ok(names.has("redmine_add_watcher"));
 });
@@ -69,6 +77,7 @@ test("read-only mode hides write tools and keeps read tools visible", () => {
   assert.ok(names.has("redmine_search"));
   assert.ok(names.has("redmine_list_checklists"));
   assert.ok(names.has("redmine_list_time_entries"));
+  assert.ok(names.has("redmine_get_time_entry"));
   assert.ok(names.has("redmine_list_versions"));
   assert.ok(names.has("redmine_list_watchers"));
   assert.equal(names.has("redmine_create_issue"), false);
@@ -112,6 +121,7 @@ test("feature disable flags hide grouped tools", () => {
   assert.equal(names.has("redmine_list_checklists"), false);
   assert.equal(names.has("redmine_list_issue_relations"), false);
   assert.equal(names.has("redmine_list_time_entries"), false);
+  assert.equal(names.has("redmine_get_time_entry"), false);
   assert.equal(names.has("redmine_list_time_entry_activities"), false);
   assert.equal(names.has("redmine_list_versions"), false);
   assert.equal(names.has("redmine_list_watchers"), false);
@@ -171,6 +181,64 @@ test("search targets the native Redmine search endpoint", async () => {
   assert.equal(url.searchParams.get("issues"), "true");
   assert.equal(url.searchParams.get("open_issues"), "true");
   assert.equal(url.searchParams.get("limit"), "10");
+});
+
+test("metadata tools target native Redmine REST endpoints", async () => {
+  const requests = [];
+  const client = createClient(requests);
+
+  await callTool(client, "redmine_get_project", {
+    project_id: "demo",
+    include: ["trackers", "issue_categories"],
+  });
+  await callTool(client, "redmine_list_trackers");
+  await callTool(client, "redmine_list_issue_priorities");
+  await callTool(client, "redmine_list_issue_categories", {
+    project_id: "demo",
+  });
+  await callTool(client, "redmine_list_custom_fields");
+  await callTool(client, "redmine_list_queries", {
+    project_id: "demo",
+  });
+  await callTool(client, "redmine_get_current_user", {
+    include: ["memberships", "groups"],
+  });
+
+  assert.equal(
+    requests[0].url,
+    "https://redmine.example.com/projects/demo.json?include=trackers%2Cissue_categories"
+  );
+  assert.equal(requests[1].url, "https://redmine.example.com/trackers.json");
+  assert.equal(
+    requests[2].url,
+    "https://redmine.example.com/enumerations/issue_priorities.json"
+  );
+  assert.equal(
+    requests[3].url,
+    "https://redmine.example.com/projects/demo/issue_categories.json"
+  );
+  assert.equal(requests[4].url, "https://redmine.example.com/custom_fields.json");
+
+  const queriesUrl = new URL(requests[5].url);
+  assert.equal(queriesUrl.pathname, "/queries.json");
+  assert.equal(queriesUrl.searchParams.get("project_id"), "demo");
+
+  assert.equal(
+    requests[6].url,
+    "https://redmine.example.com/users/current.json?include=memberships%2Cgroups"
+  );
+});
+
+test("time entry read tools target Redmine time entry endpoints", async () => {
+  const requests = [];
+  const client = createClient(requests);
+
+  await callTool(client, "redmine_get_time_entry", {
+    time_entry_id: 7,
+  });
+
+  assert.equal(requests[0].url, "https://redmine.example.com/time_entries/7.json");
+  assert.equal(requests[0].request.method, "GET");
 });
 
 test("issue creation targets the Redmine issues endpoint", async () => {
