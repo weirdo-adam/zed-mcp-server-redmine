@@ -6,6 +6,14 @@
 Node.js 运行时启动随附的 stdio MCP server。随附的 `server/index.js` 入口
 也可以作为本地 MCP server，用于支持 stdio MCP 的 agent 开发工具。
 
+## 项目定位
+
+- 主要发布形态：Zed 扩展。
+- 内置运行时：独立 Redmine stdio MCP server。
+- 补充使用方式：Claude、Codex 以及其他 agent 工具的本地 MCP 配置。
+- 包状态：本仓库不作为 npm package 发布；npm scripts 用于本地开发、安装和
+  手动 release 打包。
+
 ## 运行要求
 
 - Redmine 已开启 REST API。

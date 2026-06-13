@@ -6,6 +6,9 @@
 - 独立 stdio MCP server：由支持本地 stdio MCP 的客户端启动
   `node server/index.js`。
 
+Zed 扩展是主要发布形态。独立 stdio 使用方式是为本地 agent 开发工具提供的
+补充路径。
+
 外部客户端配置建议使用绝对路径。API key 应放在用户级客户端配置或环境变量中，
 不要提交到项目仓库。
 

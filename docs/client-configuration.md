@@ -6,6 +6,9 @@ This repository provides two entrypoints:
 - Standalone stdio MCP server: started with `node server/index.js` by any MCP
   client that supports local stdio servers.
 
+The Zed extension is the primary distribution. Standalone stdio usage is a
+supported secondary path for local agent development tools.
+
 Use absolute paths when configuring external clients. Store API keys in
 user-scoped client settings or environment variables, not in committed project
 files.

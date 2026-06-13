@@ -7,6 +7,15 @@ bundled stdio MCP server with Zed's Node.js runtime. The bundled
 `server/index.js` entrypoint can also run as a local MCP server for agent
 development tools that support stdio MCP servers.
 
+## Project Positioning
+
+- Primary distribution: Zed extension.
+- Bundled runtime: standalone Redmine stdio MCP server.
+- Secondary usage: local MCP configuration for Claude, Codex, and other agent
+  tools.
+- Package status: this repository is not published as an npm package; npm
+  scripts are for local development, installation, and manual release packaging.
+
 ## Requirements
 
 - Redmine with REST API access enabled.

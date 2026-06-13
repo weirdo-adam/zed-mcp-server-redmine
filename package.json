@@ -1,8 +1,15 @@
 {
   "name": "zed-mcp-server-redmine",
   "version": "0.1.0",
+  "description": "Zed extension that bundles a Redmine stdio MCP server.",
   "private": true,
   "type": "module",
+  "keywords": [
+    "zed",
+    "mcp",
+    "redmine",
+    "extension"
+  ],
   "scripts": {
     "check": "npm run lint:js && npm test && cargo check && cargo clippy --all-targets --all-features -- -D warnings",
     "format:check": "cargo fmt --check",
