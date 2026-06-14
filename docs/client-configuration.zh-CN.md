@@ -1,28 +1,14 @@
 # 客户端配置
 
-本扩展启动本机已安装的 `redmine-mcp-server` 可执行文件。扩展不内置、不下载
-server。
-
-先安装 server：
-
-```sh
-brew install weirdo-adam/tap/redmine-mcp-server
-```
+本扩展会下载匹配当前平台的 `redmine-mcp-server` GitHub Release 二进制，并将其作为
+Zed `redmine` context server 启动。
 
 ## Zed
-
-macOS 下扩展默认使用标准 Homebrew 路径：
-
-- Apple Silicon：`/opt/homebrew/bin/redmine-mcp-server`
-- Intel：`/usr/local/bin/redmine-mcp-server`
-
-如果 server 安装在其他位置，显式设置 `command`：
 
 ```json
 {
   "context_servers": {
     "redmine": {
-      "command": "/opt/homebrew/bin/redmine-mcp-server",
       "settings": {
         "REDMINE_BASE_URL": "https://redmine.example.com",
         "REDMINE_API_KEY": "your-api-key",
@@ -33,9 +19,6 @@ macOS 下扩展默认使用标准 Homebrew 路径：
 }
 ```
 
-如果 `redmine-mcp-server` 在其他平台存在于 Zed 进程继承到的环境中，可以省略
-`command` 配置。通过 GUI 启动的 Zed 通常不会读取 `.zshrc`。
-
 ## 配置优先级
 
 扩展按以下顺序向 server 传递环境变量：
@@ -44,7 +27,21 @@ macOS 下扩展默认使用标准 Homebrew 路径：
 2. Zed `command.env`
 3. Zed 进程继承到的环境变量
 
-Zed `settings` 中的空字符串会被忽略，因此可回退到 Zed 进程继承的环境变量。
+Zed `settings` 中的空字符串会被忽略。
+
+## 手动 Server 路径
+
+仅在需要使用手动安装的 server 时设置 `command`：
+
+```json
+{
+  "context_servers": {
+    "redmine": {
+      "command": "/opt/homebrew/bin/redmine-mcp-server"
+    }
+  }
+}
+```
 
 ## 环境变量
 
@@ -63,11 +60,3 @@ Zed `settings` 中的空字符串会被忽略，因此可回退到 Zed 进程继
 | `REDMINE_MCP_DISABLE_VERSIONS` | `false` | 禁用版本工具。 |
 | `REDMINE_MCP_DISABLE_WATCHERS` | `false` | 禁用关注者工具。 |
 | `REDMINE_MCP_DISABLE_WIKI` | `false` | 禁用 Wiki 工具。 |
-
-## 其他客户端
-
-Claude、Codex 和其他 MCP 客户端示例由独立 server 仓库维护：
-
-```text
-https://github.com/weirdo-adam/redmine-mcp-server
-```

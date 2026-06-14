@@ -10,42 +10,20 @@ GitHub Releases, and Homebrew formula are maintained in
 ## Requirements
 
 - Zed with MCP extension support
-- `redmine-mcp-server` installed locally
 - Redmine REST API enabled
 - Redmine API key with the required project permissions
 
-## Server Installation
+## Server Binary
 
-```sh
-brew install weirdo-adam/tap/redmine-mcp-server
-```
-
-Apple Silicon Homebrew installs the executable at:
-
-```text
-/opt/homebrew/bin/redmine-mcp-server
-```
-
-Intel macOS Homebrew installs the executable at:
-
-```text
-/usr/local/bin/redmine-mcp-server
-```
+The extension downloads the matching `redmine-mcp-server` GitHub Release binary
+automatically and caches it in the Zed extension runtime directory.
 
 ## Zed Configuration
-
-On macOS, the extension uses the standard Homebrew path by default:
-
-- Apple Silicon: `/opt/homebrew/bin/redmine-mcp-server`
-- Intel: `/usr/local/bin/redmine-mcp-server`
-
-If the server is installed in another location, set `command` explicitly.
 
 ```json
 {
   "context_servers": {
     "redmine": {
-      "command": "/opt/homebrew/bin/redmine-mcp-server",
       "settings": {
         "REDMINE_BASE_URL": "https://redmine.example.com",
         "REDMINE_API_KEY": "your-api-key",
@@ -62,9 +40,19 @@ Configuration precedence:
 2. Zed `command.env`
 3. Environment inherited by the Zed process
 
-Empty string values in Zed `settings` are ignored, allowing the server to use
-environment variables inherited by Zed. Environment variables from `.zshrc` are
-not reliable when Zed is launched from Dock or Spotlight.
+Empty string values in Zed `settings` are ignored.
+
+To use a manually installed server, set `command` explicitly:
+
+```json
+{
+  "context_servers": {
+    "redmine": {
+      "command": "/opt/homebrew/bin/redmine-mcp-server"
+    }
+  }
+}
+```
 
 ## Settings
 
@@ -76,7 +64,7 @@ not reliable when Zed is launched from Dock or Spotlight.
 | `REDMINE_MCP_ENABLE_DELETES` | `false` | Expose destructive delete/remove tools. |
 | `REDMINE_TIMEOUT_MS` | `30000` | HTTP request timeout in milliseconds. |
 
-Additional server settings are documented in the standalone server repository.
+Server settings are documented in the standalone server repository.
 
 ## Development
 
@@ -91,7 +79,7 @@ target check.
 
 This repository does not publish a plugin tarball or server archive. Zed
 extension publishing is handled through Zed's extension registry. Server
-Releases and Homebrew updates belong to the standalone server repository.
+Releases and Homebrew updates are maintained in the standalone server repository.
 
 ## Security
 

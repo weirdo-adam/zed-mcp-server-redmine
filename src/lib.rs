@@ -1,16 +1,23 @@
 #![forbid(unsafe_code)]
 #![warn(clippy::all)]
 
-use std::collections::HashMap;
+use std::{collections::HashMap, fs};
 
 use zed::settings::ContextServerSettings;
 use zed_extension_api as zed;
 
-struct RedmineExtension;
+const SERVER_REPOSITORY: &str = "weirdo-adam/redmine-mcp-server";
+const SERVER_BINARY_NAME: &str = "redmine-mcp-server";
+
+struct RedmineExtension {
+    cached_binary_path: Option<String>,
+}
 
 impl zed::Extension for RedmineExtension {
     fn new() -> Self {
-        Self
+        Self {
+            cached_binary_path: None,
+        }
     }
 
     fn context_server_command(
@@ -33,10 +40,14 @@ impl zed::Extension for RedmineExtension {
             .unwrap_or_default();
 
         if let Some(command_settings) = context_settings.command {
+            let command = if let Some(path) = command_settings.path {
+                path
+            } else {
+                self.server_binary_path()?
+            };
+
             return Ok(zed::Command {
-                command: command_settings
-                    .path
-                    .unwrap_or_else(default_server_binary_path),
+                command,
                 args: command_settings.arguments.unwrap_or_default(),
                 env: merge_env(
                     command_settings
@@ -50,7 +61,7 @@ impl zed::Extension for RedmineExtension {
         }
 
         Ok(zed::Command {
-            command: default_server_binary_path(),
+            command: self.server_binary_path()?,
             args: Vec::new(),
             env: settings_env,
         })
@@ -75,13 +86,106 @@ impl zed::Extension for RedmineExtension {
 
 zed::register_extension!(RedmineExtension);
 
-fn default_server_binary_path() -> String {
-    match zed::current_platform() {
-        (zed::Os::Mac, zed::Architecture::Aarch64) => {
-            "/opt/homebrew/bin/redmine-mcp-server".to_string()
+impl RedmineExtension {
+    fn server_binary_path(&mut self) -> zed::Result<String> {
+        if let Some(path) = &self.cached_binary_path
+            && fs::metadata(path).is_ok_and(|stat| stat.is_file())
+        {
+            return Ok(path.clone());
         }
-        (zed::Os::Mac, _) => "/usr/local/bin/redmine-mcp-server".to_string(),
-        _ => "redmine-mcp-server".to_string(),
+
+        let release = zed::latest_github_release(
+            SERVER_REPOSITORY,
+            zed::GithubReleaseOptions {
+                require_assets: true,
+                pre_release: false,
+            },
+        )?;
+
+        let (os, arch) = zed::current_platform();
+        let asset_name = release_asset_name(&release.version, os, arch)?;
+        let asset = release
+            .assets
+            .iter()
+            .find(|asset| asset.name == asset_name)
+            .ok_or_else(|| format!("missing Redmine MCP server release asset `{asset_name}`"))?;
+
+        let version_dir = cached_version_dir(&release.version);
+        let binary_path = format!("{version_dir}/{}", binary_executable_name(os));
+
+        if !fs::metadata(&binary_path).is_ok_and(|stat| stat.is_file()) {
+            fs::create_dir_all(&version_dir)
+                .map_err(|err| format!("failed to create `{version_dir}`: {err}"))?;
+
+            zed::download_file(
+                &asset.download_url,
+                &version_dir,
+                zed::DownloadedFileType::GzipTar,
+            )
+            .map_err(|err| format!("failed to download `{asset_name}`: {err}"))?;
+
+            if os != zed::Os::Windows {
+                zed::make_file_executable(&binary_path)?;
+            }
+
+            cleanup_cached_versions(&version_dir);
+        }
+
+        self.cached_binary_path = Some(binary_path.clone());
+        Ok(binary_path)
+    }
+}
+
+fn release_asset_name(version: &str, os: zed::Os, arch: zed::Architecture) -> zed::Result<String> {
+    let version = version.strip_prefix('v').unwrap_or(version);
+    let os = match os {
+        zed::Os::Mac => "macos",
+        zed::Os::Linux => "linux",
+        zed::Os::Windows => "windows",
+    };
+    let arch = match arch {
+        zed::Architecture::Aarch64 => "aarch64",
+        zed::Architecture::X8664 => "x86_64",
+        zed::Architecture::X86 => {
+            return Err("redmine-mcp-server does not publish x86 release assets".to_string());
+        }
+    };
+
+    Ok(format!("{SERVER_BINARY_NAME}-{version}-{os}-{arch}.tar.gz"))
+}
+
+fn cached_version_dir(version: &str) -> String {
+    format!("{SERVER_BINARY_NAME}-{version}")
+}
+
+fn binary_executable_name(os: zed::Os) -> String {
+    match os {
+        zed::Os::Windows => format!("{SERVER_BINARY_NAME}.exe"),
+        zed::Os::Mac | zed::Os::Linux => SERVER_BINARY_NAME.to_string(),
+    }
+}
+
+fn cleanup_cached_versions(current_dir: &str) {
+    if let Ok(entries) = fs::read_dir(".") {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let is_cached_server_dir = entry
+                .file_name()
+                .to_str()
+                .is_some_and(|name| name.starts_with(&format!("{SERVER_BINARY_NAME}-")));
+
+            let is_current_dir = entry
+                .file_name()
+                .to_str()
+                .is_some_and(|name| name == current_dir);
+
+            if is_cached_server_dir
+                && !is_current_dir
+                && entry.file_type().is_ok_and(|file_type| file_type.is_dir())
+            {
+                let _ = fs::remove_dir_all(path);
+            }
+        }
     }
 }
 
@@ -205,11 +309,7 @@ fn setting_value_to_env(value: &zed::serde_json::Value) -> Option<String> {
     }
 }
 
-const INSTALLATION_INSTRUCTIONS: &str = r#"Install the standalone server before enabling this extension:
-
-  brew install weirdo-adam/tap/redmine-mcp-server
-
-Set `REDMINE_BASE_URL` and `REDMINE_API_KEY` below to pass them through Zed settings. Leave them empty only when the Zed process inherits those environment variables from the operating system.
+const INSTALLATION_INSTRUCTIONS: &str = r#"This extension downloads the matching redmine-mcp-server release binary automatically.
 
 Use `REDMINE_MCP_READ_ONLY=true` when the agent should inspect Redmine without making changes. Destructive delete/remove tools are disabled by default; expose them only with `REDMINE_MCP_ENABLE_DELETES=true`."#;
 
@@ -299,7 +399,10 @@ const SETTINGS_SCHEMA: &str = r#"{
 
 #[cfg(test)]
 mod tests {
-    use super::{env_from_settings, merge_env};
+    use super::{
+        binary_executable_name, cached_version_dir, env_from_settings, merge_env,
+        release_asset_name,
+    };
     use zed_extension_api::serde_json::json;
 
     #[test]
@@ -378,6 +481,55 @@ mod tests {
 
         assert_env(&env, "REDMINE_BASE_URL", "https://settings.example.com");
         assert_env(&env, "REDMINE_API_KEY", "command-key");
+    }
+
+    #[test]
+    fn release_asset_name_matches_platform_naming() {
+        let asset = release_asset_name(
+            "v0.1.0",
+            zed_extension_api::Os::Mac,
+            zed_extension_api::Architecture::Aarch64,
+        );
+
+        assert_eq!(
+            asset.as_deref(),
+            Ok("redmine-mcp-server-0.1.0-macos-aarch64.tar.gz")
+        );
+
+        let asset = release_asset_name(
+            "0.1.0",
+            zed_extension_api::Os::Linux,
+            zed_extension_api::Architecture::X8664,
+        );
+
+        assert_eq!(
+            asset.as_deref(),
+            Ok("redmine-mcp-server-0.1.0-linux-x86_64.tar.gz")
+        );
+    }
+
+    #[test]
+    fn release_asset_name_rejects_unsupported_x86() {
+        let asset = release_asset_name(
+            "v0.1.0",
+            zed_extension_api::Os::Windows,
+            zed_extension_api::Architecture::X86,
+        );
+
+        assert!(asset.is_err());
+    }
+
+    #[test]
+    fn binary_cache_paths_match_downloaded_archive() {
+        assert_eq!(cached_version_dir("v0.1.0"), "redmine-mcp-server-v0.1.0");
+        assert_eq!(
+            binary_executable_name(zed_extension_api::Os::Windows),
+            "redmine-mcp-server.exe"
+        );
+        assert_eq!(
+            binary_executable_name(zed_extension_api::Os::Linux),
+            "redmine-mcp-server"
+        );
     }
 
     #[test]
