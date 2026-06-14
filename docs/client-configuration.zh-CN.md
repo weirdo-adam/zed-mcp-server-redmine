@@ -1,211 +1,73 @@
-# Agent 客户端配置
+# 客户端配置
 
-本仓库提供两个入口：
+本扩展启动本机已安装的 `redmine-mcp-server` 可执行文件。扩展不内置、不下载
+server。
 
-- Zed 扩展：通过 Zed 扩展市场安装，由 Zed 启动。
-- 独立 stdio MCP server：由支持本地 stdio MCP 的客户端启动
-  `node server/index.js`。
-
-Zed 扩展是主要发布形态。独立 stdio 使用方式是为本地 agent 开发工具提供的
-补充路径。
-
-外部客户端配置建议使用绝对路径。API key 应放在用户级客户端配置或环境变量中，
-不要提交到项目仓库。
-
-## 本地启动
-
-在仓库根目录执行：
+先安装 server：
 
 ```sh
-export REDMINE_BASE_URL="https://redmine.example.com"
-export REDMINE_API_KEY="your-api-key"
-export REDMINE_MCP_READ_ONLY=true
-npm start
+brew install weirdo-adam/tap/redmine-mcp-server
 ```
 
-服务通过 stdin/stdout 使用按行分隔的 JSON-RPC。启动后会等待 MCP 客户端消息，
-不会输出启动 banner。
+## Zed
 
-Smoke test：
+macOS 下扩展默认使用标准 Homebrew 路径：
 
-```sh
-export REDMINE_BASE_URL="https://redmine.example.com"
-export REDMINE_API_KEY="your-api-key"
-printf '%s\n' \
-  '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
-  '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
-  | npm start
-```
+- Apple Silicon：`/opt/homebrew/bin/redmine-mcp-server`
+- Intel：`/usr/local/bin/redmine-mcp-server`
 
-## 一键本地安装
-
-安装到用户目录并生成 launcher：
-
-```sh
-scripts/install-local.sh
-```
-
-默认安装目录：
-
-```text
-~/.local/share/redmine-mcp-server
-```
-
-可通过 `REDMINE_MCP_INSTALL_DIR` 指定安装目录：
-
-```sh
-REDMINE_MCP_INSTALL_DIR="$HOME/.local/share/redmine-mcp-server" scripts/install-local.sh
-```
-
-安装完成后，外部客户端可使用：
-
-```text
-~/.local/share/redmine-mcp-server/bin/redmine-mcp-server
-```
-
-## Zed 扩展
-
-通过 Zed 扩展安装后，在 Zed settings 中配置随附的 `redmine` context server：
+如果 server 安装在其他位置，显式设置 `command`：
 
 ```json
 {
   "context_servers": {
     "redmine": {
+      "command": "/opt/homebrew/bin/redmine-mcp-server",
       "settings": {
         "REDMINE_BASE_URL": "https://redmine.example.com",
         "REDMINE_API_KEY": "your-api-key",
-        "REDMINE_MCP_READ_ONLY": false
+        "REDMINE_MCP_READ_ONLY": true
       }
     }
   }
 }
 ```
 
-Zed 会使用内置 Node.js runtime 启动随附 server。
+如果 `redmine-mcp-server` 在其他平台存在于 Zed 进程继承到的环境中，可以省略
+`command` 配置。通过 GUI 启动的 Zed 通常不会读取 `.zshrc`。
 
-## Zed 自定义命令
+## 配置优先级
 
-本地开发或未通过扩展市场安装时，也可以直接指向独立 server：
+扩展按以下顺序向 server 传递环境变量：
 
-```json
-{
-  "context_servers": {
-    "redmine": {
-      "command": {
-        "path": "node",
-        "arguments": [
-          "/absolute/path/to/zed-mcp-server-redmine/server/index.js"
-        ],
-        "env": {
-          "REDMINE_BASE_URL": "https://redmine.example.com",
-          "REDMINE_API_KEY": "your-api-key",
-          "REDMINE_MCP_READ_ONLY": "true"
-        }
-      }
-    }
-  }
-}
+1. Zed `settings`
+2. Zed `command.env`
+3. Zed 进程继承到的环境变量
+
+Zed `settings` 中的空字符串会被忽略，因此可回退到 Zed 进程继承的环境变量。
+
+## 环境变量
+
+| 变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `REDMINE_BASE_URL` | 无 | Redmine 实例地址。 |
+| `REDMINE_API_KEY` | 无 | Redmine REST API key。 |
+| `REDMINE_MCP_READ_ONLY` | `true` | 隐藏并拒绝写工具。 |
+| `REDMINE_MCP_ENABLE_DELETES` | `false` | 暴露删除和移除工具。 |
+| `REDMINE_TIMEOUT_MS` | `30000` | HTTP 请求超时时间，单位毫秒。 |
+| `REDMINE_MCP_ATTACHMENT_MAX_BYTES` | `10485760` | 附件下载最大字节数。 |
+| `REDMINE_MCP_DISABLE_ATTACHMENTS` | `false` | 禁用附件工具。 |
+| `REDMINE_MCP_DISABLE_CHECKLISTS` | `false` | 禁用 Redmine Checklists 工具。 |
+| `REDMINE_MCP_DISABLE_RELATIONS` | `false` | 禁用问题关联工具。 |
+| `REDMINE_MCP_DISABLE_TIME_ENTRIES` | `false` | 禁用工时工具。 |
+| `REDMINE_MCP_DISABLE_VERSIONS` | `false` | 禁用版本工具。 |
+| `REDMINE_MCP_DISABLE_WATCHERS` | `false` | 禁用关注者工具。 |
+| `REDMINE_MCP_DISABLE_WIKI` | `false` | 禁用 Wiki 工具。 |
+
+## 其他客户端
+
+Claude、Codex 和其他 MCP 客户端示例由独立 server 仓库维护：
+
+```text
+https://github.com/weirdo-adam/redmine-mcp-server
 ```
-
-## Claude Code
-
-Claude Code 可通过 `claude mcp add` 注册本地 stdio MCP server：
-
-```sh
-claude mcp add --transport stdio redmine \
-  --env REDMINE_BASE_URL=https://redmine.example.com \
-  --env REDMINE_API_KEY=your-api-key \
-  --env REDMINE_MCP_READ_ONLY=true \
-  -- node /absolute/path/to/zed-mcp-server-redmine/server/index.js
-```
-
-项目级 `.mcp.json` 示例：
-
-```json
-{
-  "mcpServers": {
-    "redmine": {
-      "type": "stdio",
-      "command": "node",
-      "args": [
-        "/absolute/path/to/zed-mcp-server-redmine/server/index.js"
-      ],
-      "env": {
-        "REDMINE_BASE_URL": "https://redmine.example.com",
-        "REDMINE_API_KEY": "${REDMINE_API_KEY}",
-        "REDMINE_MCP_READ_ONLY": "true"
-      }
-    }
-  }
-}
-```
-
-## Claude Desktop
-
-在用户级 Claude Desktop MCP 配置中添加：
-
-```json
-{
-  "mcpServers": {
-    "redmine": {
-      "command": "node",
-      "args": [
-        "/absolute/path/to/zed-mcp-server-redmine/server/index.js"
-      ],
-      "env": {
-        "REDMINE_BASE_URL": "https://redmine.example.com",
-        "REDMINE_API_KEY": "your-api-key",
-        "REDMINE_MCP_READ_ONLY": "true"
-      }
-    }
-  }
-}
-```
-
-修改后重启 Claude Desktop。
-
-## Codex
-
-支持本地 stdio MCP server 的 Codex 客户端可在用户级或项目级配置中添加：
-
-```toml
-[mcp_servers.redmine]
-command = "node"
-args = ["/absolute/path/to/zed-mcp-server-redmine/server/index.js"]
-
-[mcp_servers.redmine.env]
-REDMINE_BASE_URL = "https://redmine.example.com"
-REDMINE_API_KEY = "your-api-key"
-REDMINE_MCP_READ_ONLY = "true"
-```
-
-真实 API key 建议放在用户级配置。项目级配置只建议使用环境变量引用或只读测试
-凭据。
-
-## 其他 MCP 客户端
-
-使用相同 stdio 约定：
-
-- Command: `node`
-- Arguments: `["/absolute/path/to/zed-mcp-server-redmine/server/index.js"]`
-- 必填环境变量：`REDMINE_BASE_URL`、`REDMINE_API_KEY`
-- 建议安全开关：`REDMINE_MCP_READ_ONLY=true`
-- 可选破坏性删除/移除开关：`REDMINE_MCP_ENABLE_DELETES=true`
-- 可选功能开关示例：`REDMINE_MCP_DISABLE_WIKI=true`
-- 可选附件限制：`REDMINE_MCP_ATTACHMENT_MAX_BYTES=10485760`
-
-已暴露的 Redmine API 范围和 feature flags 见 [api-coverage.md](api-coverage.md)。
-
-## 发布
-
-本仓库不发布插件 tarball。Zed 扩展发布通过 Zed 扩展市场完成：扩展条目指向
-具体仓库提交，由 Zed 侧构建扩展包。
-
-独立 `redmine-mcp-server` 的 GitHub Releases 和 Homebrew formula 更新应放在
-独立 server 分发中，不放在这个插件仓库里。
-
-## 参考
-
-- [Zed MCP extensions](https://zed.dev/docs/extensions/mcp-extensions)
-- [Claude Code MCP](https://code.claude.com/docs/en/mcp)
-- [Model Context Protocol](https://modelcontextprotocol.io/)

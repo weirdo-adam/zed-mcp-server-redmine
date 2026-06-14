@@ -33,25 +33,25 @@ impl zed::Extension for RedmineExtension {
             .unwrap_or_default();
 
         if let Some(command_settings) = context_settings.command {
-            let mut env = command_settings
-                .env
-                .unwrap_or_default()
-                .into_iter()
-                .collect::<Vec<_>>();
-            env.extend(settings_env);
-
             return Ok(zed::Command {
                 command: command_settings
                     .path
-                    .unwrap_or_else(default_node_binary_path),
+                    .unwrap_or_else(default_server_binary_path),
                 args: command_settings.arguments.unwrap_or_default(),
-                env,
+                env: merge_env(
+                    command_settings
+                        .env
+                        .unwrap_or_default()
+                        .into_iter()
+                        .collect(),
+                    settings_env,
+                ),
             });
         }
 
         Ok(zed::Command {
-            command: default_node_binary_path(),
-            args: vec!["server/index.js".to_string()],
+            command: default_server_binary_path(),
+            args: Vec::new(),
             env: settings_env,
         })
     }
@@ -75,8 +75,27 @@ impl zed::Extension for RedmineExtension {
 
 zed::register_extension!(RedmineExtension);
 
-fn default_node_binary_path() -> String {
-    zed::node_binary_path().unwrap_or_else(|_| "node".to_string())
+fn default_server_binary_path() -> String {
+    match zed::current_platform() {
+        (zed::Os::Mac, zed::Architecture::Aarch64) => {
+            "/opt/homebrew/bin/redmine-mcp-server".to_string()
+        }
+        (zed::Os::Mac, _) => "/usr/local/bin/redmine-mcp-server".to_string(),
+        _ => "redmine-mcp-server".to_string(),
+    }
+}
+
+fn merge_env(
+    command_env: Vec<(String, String)>,
+    settings_env: Vec<(String, String)>,
+) -> Vec<(String, String)> {
+    let mut env = command_env.into_iter().collect::<HashMap<_, _>>();
+
+    for (key, value) in settings_env {
+        env.insert(key, value);
+    }
+
+    env.into_iter().collect()
 }
 
 fn env_from_settings(settings: &zed::serde_json::Value) -> Vec<(String, String)> {
@@ -186,16 +205,18 @@ fn setting_value_to_env(value: &zed::serde_json::Value) -> Option<String> {
     }
 }
 
-const INSTALLATION_INSTRUCTIONS: &str = r#"Set `REDMINE_BASE_URL` and `REDMINE_API_KEY` below to connect Zed to Redmine.
+const INSTALLATION_INSTRUCTIONS: &str = r#"Install the standalone server before enabling this extension:
 
-Core issue, search, and metadata tools are always active. Optional tool groups are enabled by default; add `REDMINE_MCP_DISABLE_*` settings only when a group or plugin is not needed.
+  brew install weirdo-adam/tap/redmine-mcp-server
+
+Set `REDMINE_BASE_URL` and `REDMINE_API_KEY` below to pass them through Zed settings. Leave them empty only when the Zed process inherits those environment variables from the operating system.
 
 Use `REDMINE_MCP_READ_ONLY=true` when the agent should inspect Redmine without making changes. Destructive delete/remove tools are disabled by default; expose them only with `REDMINE_MCP_ENABLE_DELETES=true`."#;
 
 const DEFAULT_SETTINGS: &str = r#"{
-  "REDMINE_BASE_URL": "https://redmine.example.com",
+  "REDMINE_BASE_URL": "",
   "REDMINE_API_KEY": "",
-  "REDMINE_MCP_READ_ONLY": false
+  "REDMINE_MCP_READ_ONLY": true
 }"#;
 
 const SETTINGS_SCHEMA: &str = r#"{
@@ -205,15 +226,15 @@ const SETTINGS_SCHEMA: &str = r#"{
   "properties": {
     "REDMINE_BASE_URL": {
       "type": "string",
-      "description": "Base URL for the Redmine instance, for example https://redmine.example.com."
+      "description": "Base URL for the Redmine instance. Leave blank to use the environment inherited by Zed."
     },
     "REDMINE_API_KEY": {
       "type": "string",
-      "description": "Redmine REST API key."
+      "description": "Redmine REST API key. Leave blank to use the environment inherited by Zed."
     },
     "REDMINE_MCP_READ_ONLY": {
       "type": "boolean",
-      "default": false,
+      "default": true,
       "description": "When true, write tools are hidden from tools/list and rejected if called directly."
     },
     "REDMINE_MCP_ENABLE_DELETES": {
@@ -273,13 +294,12 @@ const SETTINGS_SCHEMA: &str = r#"{
       "default": 30000,
       "description": "HTTP request timeout in milliseconds."
     }
-  },
-  "required": ["REDMINE_BASE_URL", "REDMINE_API_KEY"]
+  }
 }"#;
 
 #[cfg(test)]
 mod tests {
-    use super::env_from_settings;
+    use super::{env_from_settings, merge_env};
     use zed_extension_api::serde_json::json;
 
     #[test]
@@ -328,6 +348,39 @@ mod tests {
     }
 
     #[test]
+    fn skips_empty_string_settings_to_allow_environment_fallback() {
+        let env = env_from_settings(&json!({
+            "REDMINE_BASE_URL": "",
+            "REDMINE_API_KEY": "",
+            "REDMINE_MCP_READ_ONLY": true
+        }));
+
+        assert!(!env.iter().any(|(key, _)| key == "REDMINE_BASE_URL"));
+        assert!(!env.iter().any(|(key, _)| key == "REDMINE_API_KEY"));
+        assert_env(&env, "REDMINE_MCP_READ_ONLY", "true");
+    }
+
+    #[test]
+    fn settings_environment_overrides_command_environment() {
+        let env = merge_env(
+            vec![
+                (
+                    "REDMINE_BASE_URL".to_string(),
+                    "https://command.example.com".to_string(),
+                ),
+                ("REDMINE_API_KEY".to_string(), "command-key".to_string()),
+            ],
+            vec![(
+                "REDMINE_BASE_URL".to_string(),
+                "https://settings.example.com".to_string(),
+            )],
+        );
+
+        assert_env(&env, "REDMINE_BASE_URL", "https://settings.example.com");
+        assert_env(&env, "REDMINE_API_KEY", "command-key");
+    }
+
+    #[test]
     fn default_settings_match_settings_schema_shape() {
         let parsed: Result<zed_extension_api::serde_json::Value, _> =
             zed_extension_api::serde_json::from_str(super::DEFAULT_SETTINGS);
@@ -338,6 +391,24 @@ mod tests {
         assert!(settings.get("REDMINE_BASE_URL").is_some());
         assert!(settings.get("REDMINE_API_KEY").is_some());
         assert!(settings.get("REDMINE_MCP_READ_ONLY").is_some());
+        assert_eq!(
+            settings
+                .get("REDMINE_BASE_URL")
+                .and_then(zed_extension_api::serde_json::Value::as_str),
+            Some("")
+        );
+        assert_eq!(
+            settings
+                .get("REDMINE_API_KEY")
+                .and_then(zed_extension_api::serde_json::Value::as_str),
+            Some("")
+        );
+        assert_eq!(
+            settings
+                .get("REDMINE_MCP_READ_ONLY")
+                .and_then(zed_extension_api::serde_json::Value::as_bool),
+            Some(true)
+        );
     }
 
     fn assert_env(env: &[(String, String)], key: &str, expected: &str) {

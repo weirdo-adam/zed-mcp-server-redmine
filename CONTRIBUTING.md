@@ -1,12 +1,10 @@
 # Contributing
 
-Thanks for contributing. Keep changes focused and include tests for behavior
-changes.
+Keep changes focused and include tests for behavior changes.
 
 ## Development Setup
 
-Install a recent Rust toolchain with the components in `rust-toolchain.toml` and
-Node.js 18.17 or newer.
+Install a recent Rust toolchain with the components in `rust-toolchain.toml`.
 
 Clone the repository and run checks from the repository root.
 
@@ -21,34 +19,22 @@ scripts/check.sh
 Individual commands:
 
 ```sh
-npm run lint:js
-npm test
 cargo fmt --check
+cargo check
 cargo clippy --all-targets --all-features -- -D warnings
 cargo check --target wasm32-wasip2
 ```
 
-The MCP server speaks newline-delimited JSON-RPC over stdio. Keep stdout reserved
-for protocol messages; write diagnostics to stderr.
-
 ## Pull Requests
 
-- Keep pull requests scoped to one behavior, tool group, or documentation change.
-- Update `README.md`, `README.zh-CN.md`, or `docs/api-coverage.md` when changing
-  user-facing behavior or API coverage.
-- Include tests for new tools and read-only mode behavior for new write tools.
+- Keep pull requests scoped to one extension behavior or documentation change.
+- Update `README.md`, `README.zh-CN.md`, or `docs/client-configuration.md` when
+  changing user-facing configuration behavior.
 - Do not include Redmine API keys, private issue data, internal Redmine URLs, or
   generated local artifacts.
 
-## Adding Redmine Tools
+## Scope
 
-Before adding new tools, check `docs/api-coverage.md`.
-
-Read-only metadata tools are preferred for broadening coverage. Write tools must
-be listed in the `WRITE_TOOLS` set and must be rejected when
-`REDMINE_MCP_READ_ONLY=true`. Optional groups should have corresponding
-`REDMINE_MCP_DISABLE_*` flags when the group is plugin-dependent, high-volume, or
-not useful for every installation.
-
-High-risk administrative APIs should start with a design discussion before
-implementation.
+This repository only maintains the Zed extension. Redmine MCP server behavior,
+tool definitions, Releases, and Homebrew formula updates belong to the
+standalone `redmine-mcp-server` repository.

@@ -2,7 +2,7 @@
 name = "zed-mcp-server-redmine"
 version = "0.1.0"
 edition = "2024"
-description = "Zed MCP context server extension for Redmine."
+description = "Zed extension that launches the standalone Redmine MCP server."
 license = "MIT"
 repository = "https://github.com/weirdo-adam/zed-mcp-server-redmine"
 readme = "README.md"

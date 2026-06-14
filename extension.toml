@@ -3,7 +3,7 @@ name = "Redmine MCP Server"
 version = "0.1.0"
 schema_version = 1
 authors = ["weirdo-adam <adam.ngc2237@gmail.com>"]
-description = "Zed MCP context server for Redmine."
+description = "Zed extension that launches the standalone Redmine MCP server."
 repository = "https://github.com/weirdo-adam/zed-mcp-server-redmine"
 
 [lib]
